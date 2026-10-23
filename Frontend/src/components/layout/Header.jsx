@@ -5,9 +5,12 @@ import { useDashboard } from '../../context/DashboardContext';
 import { useSocket } from '../../context/SocketContext';
 
 const G = {
-  teal:    '#0d9488',
-  tealBg:  'rgba(13,148,136,0.08)',
-  tealBdr: 'rgba(13,148,136,0.2)',
+  teal:    '#E87F24',
+  tealBg:  'rgba(232,127,36,0.09)',
+  tealBdr: 'rgba(232,127,36,0.25)',
+  gold:    '#FFC81E',
+  cream:   '#FEFDDF',
+  blue:    '#73A5CA',
   bg:      '#ffffff',
   border:  'rgba(148,163,184,0.15)',
   text:    '#0f172a',

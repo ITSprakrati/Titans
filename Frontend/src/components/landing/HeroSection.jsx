@@ -82,15 +82,15 @@ const STAT_CARDS = [
 const HeroSection = ({ onLaunch }) => (
   <section
     className="relative min-h-screen overflow-hidden"
-    style={{ background: 'linear-gradient(140deg, #daf5f0 0%, #edf0f8 50%, #e2e8f6 100%)' }}
+    style={{ background: 'linear-gradient(140deg, #FEFDDF 0%, #fdf8e8 45%, #eef4f9 100%)' }}
   >
     {/* Dot pattern */}
     <div
       className="absolute inset-0 pointer-events-none"
       style={{
-        backgroundImage: 'radial-gradient(circle, #9abfb8 1px, transparent 1px)',
+        backgroundImage: 'radial-gradient(circle, #E87F24 1px, transparent 1px)',
         backgroundSize: '26px 26px',
-        opacity: 0.28,
+        opacity: 0.12,
       }}
     />
 
@@ -123,7 +123,7 @@ const HeroSection = ({ onLaunch }) => (
           className="font-black text-slate-900 tracking-tight leading-[0.92] mb-5"
           style={{ fontSize: 'clamp(2.8rem, 5.5vw, 4.2rem)' }}
         >
-          MediaGuard<br />Sports<br />
+          VideoGuard<br />AI<br />
           <FlipWords />
         </motion.h1>
 
@@ -188,7 +188,7 @@ const HeroSection = ({ onLaunch }) => (
           {/* Soft glow behind globe */}
           <div
             className="absolute inset-0 rounded-full pointer-events-none"
-            style={{ background: 'radial-gradient(circle, rgba(20,184,166,0.18) 0%, transparent 70%)' }}
+            style={{ background: 'radial-gradient(circle, rgba(232,127,36,0.22) 0%, transparent 70%)' }}
           />
           {/* Globe */}
           <motion.div

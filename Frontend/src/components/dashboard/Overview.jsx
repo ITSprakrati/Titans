@@ -11,11 +11,14 @@ import { motion, AnimatePresence } from 'framer-motion';
 
 // ─── GSSoC color tokens ───────────────────────────────────────────────────────
 const G = {
-  teal:    '#0d9488',
-  tealLt:  '#2dd4bf',
-  tealBg:  'rgba(13,148,136,0.08)',
-  tealBdr: 'rgba(13,148,136,0.2)',
-  bg:      '#f6f7fc',
+  teal:    '#E87F24',
+  tealLt:  '#FFC81E',
+  tealBg:  'rgba(232,127,36,0.09)',
+  tealBdr: 'rgba(232,127,36,0.25)',
+  gold:    '#FFC81E',
+  cream:   '#FEFDDF',
+  blue:    '#73A5CA',
+  bg:      '#fbfbf8',
   card:    '#ffffff',
   border:  'rgba(148,163,184,0.2)',
   text:    '#0f172a',

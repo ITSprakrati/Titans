@@ -71,7 +71,7 @@ const FeaturesDropdown = ({ onNavigate, onLaunch }) => {
 
         {/* Header strip */}
         <div className="px-5 pt-4 pb-3 border-b border-white/5">
-          <p className="text-[10px] font-black text-slate-500 uppercase tracking-[0.28em]">Explore MediaGuard</p>
+          <p className="text-[10px] font-black text-slate-500 uppercase tracking-[0.28em]">Explore VideoGuard</p>
         </div>
 
         {/* 2×2 grid */}
@@ -198,7 +198,7 @@ const Navbar = ({ onLaunch }) => {
             <Shield className="w-3.5 h-3.5 text-teal-400" />
           </div>
           <span className="text-[14px] font-black text-white tracking-tight">
-            MediaGuard<span className="text-teal-400">'26</span>
+            VideoGuard<span className="text-teal-400">'26</span>
           </span>
         </button>
 

@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=Dancing+Script:wght@400;500;600;700&family=Inter:wght@400;500;600;700;800;900&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -6,6 +8,24 @@
   body {
     @apply antialiased;
     font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  }
+
+  /* Dancing Script for headings and bold text */
+  h1, h2, h3, h4, h5, h6,
+  .font-heading,
+  .font-bold,
+  .font-black,
+  .font-extrabold,
+  b, strong,
+  [style*="font-weight: 700"],
+  [style*="font-weight: 800"],
+  [style*="font-weight: 900"],
+  [style*="font-weight: bold"],
+  [style*="font-weight:bold"],
+  [style*="font-weight:700"],
+  [style*="font-weight:800"],
+  [style*="font-weight:900"] {
+    font-family: 'Dancing Script', cursive, -apple-system, sans-serif !important;
   }
 }
 
@@ -34,7 +54,7 @@
 /* Ripple cell animation */
 @keyframes cellPulse {
   0%   { background-color: transparent; }
-  30%  { background-color: rgba(13,148,136,0.15); }
+  30%  { background-color: rgba(232,127,36,0.15); }
   100% { background-color: transparent; }
 }
 
@@ -48,10 +68,10 @@
   animation: gradientShift 3s ease infinite;
 }
 
-/* Ripple cell — GSSoC teal */
+/* Ripple cell — VideoGuard Warm Gold / Amber */
 @keyframes cellRipple {
   0%   { background-color: transparent; }
-  28%  { background-color: rgba(20,184,166,0.20); box-shadow: inset 0 0 16px rgba(20,184,166,0.14); }
+  28%  { background-color: rgba(232,127,36,0.22); box-shadow: inset 0 0 16px rgba(255,200,30,0.25); }
   100% { background-color: transparent; }
 }
 .animate-cell-ripple {

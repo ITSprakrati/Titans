@@ -169,7 +169,7 @@ const DashboardContent = () => {
             }}
             style={{
               position: 'fixed', inset: 0, zIndex: 9990,
-              background: 'radial-gradient(ellipse at center, rgba(13,148,136,0.1) 0%, rgba(2,6,23,0.97) 60%)',
+              background: 'radial-gradient(ellipse at center, rgba(232,127,36,0.12) 0%, rgba(2,6,23,0.97) 60%)',
               cursor: 'pointer',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               flexDirection: 'column', gap: 16,
@@ -182,7 +182,7 @@ const DashboardContent = () => {
                 position: 'absolute',
                 width: 80, height: 80,
                 borderRadius: '50%',
-                border: '1px solid rgba(13,148,136,0.4)',
+                border: '1px solid rgba(232,127,36,0.4)',
                 animation: `rippleExpand 4s ease-out infinite ${i * 0.6}s`,
                 opacity: 0,
                 zIndex: 0,

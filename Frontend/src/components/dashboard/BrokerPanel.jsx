@@ -1,4 +1,4 @@
-﻿import React, { useState, useMemo } from "react";
+import React, { useState, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useDashboard } from "../../context/DashboardContext";
 import { brokerService } from "../../services/api";
@@ -10,10 +10,11 @@ import {
 } from "lucide-react";
 
 const G = {
-  teal: "#0d9488", tealBg: "rgba(13,148,136,0.08)", tealBdr: "rgba(13,148,136,0.2)",
+  teal: "#E87F24", tealBg: "rgba(232,127,36,0.09)", tealBdr: "rgba(232,127,36,0.25)",
+  gold: "#FFC81E", cream: "#FEFDDF", blue: "#73A5CA",
   card: "#ffffff", border: "rgba(148,163,184,0.15)", text: "#0f172a",
-  sub: "#64748b", muted: "#94a3b8", bg: "#f6f7fc",
-  amber: "#f59e0b", amberBg: "rgba(245,158,11,0.08)", amberBdr: "rgba(245,158,11,0.2)",
+  sub: "#64748b", muted: "#94a3b8", bg: "#fbfbf8",
+  amber: "#FFC81E", amberBg: "rgba(255,200,30,0.12)", amberBdr: "rgba(255,200,30,0.3)",
   indigo: "#6366f1", indigoBg: "rgba(99,102,241,0.08)",
   purple: "#a855f7", purpleBg: "rgba(168,85,247,0.08)",
 };

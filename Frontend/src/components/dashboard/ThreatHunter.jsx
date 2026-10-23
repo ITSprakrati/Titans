@@ -16,11 +16,14 @@ import {
 
 // ─── GSSoC tokens ─────────────────────────────────────────────────────────────
 const G = {
-  teal:    '#0d9488',
-  tealBg:  'rgba(13,148,136,0.08)',
-  tealBdr: 'rgba(13,148,136,0.2)',
+  teal:    '#E87F24',
+  tealBg:  'rgba(232,127,36,0.09)',
+  tealBdr: 'rgba(232,127,36,0.25)',
+  gold:    '#FFC81E',
+  cream:   '#FEFDDF',
+  blue:    '#73A5CA',
   card:    '#ffffff',
-  bg:      '#f6f7fc',
+  bg:      '#fbfbf8',
   border:  'rgba(148,163,184,0.2)',
   text:    '#0f172a',
   sub:     '#64748b',
@@ -345,9 +348,9 @@ const ThreatHunter = () => {
               style={{
                 display: 'flex', alignItems: 'center', gap: 6, padding: '10px 20px',
                 borderRadius: 12, border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: 13,
-                background: swarmRunning || launching ? G.border : `linear-gradient(135deg, ${G.teal}, #2dd4bf)`,
+                background: swarmRunning || launching ? G.border : `linear-gradient(135deg, ${G.teal}, #FFC81E)`,
                 color: swarmRunning || launching ? G.muted : '#fff',
-                boxShadow: swarmRunning ? 'none' : `0 0 20px ${G.teal}30`,
+                boxShadow: swarmRunning ? 'none' : `0 0 20px ${G.teal}35`,
                 opacity: (!url.trim() && !swarmRunning) ? 0.5 : 1,
               }}
             >

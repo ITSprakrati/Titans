@@ -14,13 +14,25 @@ export default {
           300: '#c8c8ee',
         },
         teal: {
-          400: '#2dd4bf',
-          500: '#14b8a6',
-          600: '#0d9488',
+          50:  '#FEFDDF',
+          100: '#FEFDDF',
+          200: '#fef3c7',
+          300: '#73A5CA',
+          400: '#FFC81E',
+          500: '#E87F24',
+          600: '#d9701a',
+          700: '#b85a0e',
+        },
+        brand: {
+          primary: '#E87F24',
+          secondary: '#FFC81E',
+          cream: '#FEFDDF',
+          blue: '#73A5CA',
         }
       },
       fontFamily: {
         sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
+        dancing: ['"Dancing Script"', 'cursive', 'sans-serif'],
       },
       animation: {
         'float': 'float 6s ease-in-out infinite',

@@ -33,7 +33,7 @@ const LandingNav = ({ onLaunch }) => {
           className="flex items-center gap-2 px-3 py-1.5 rounded-full hover:bg-white/5 transition-colors"
         >
           <span className="text-sm font-black text-white tracking-tight">
-            MediaGuard<span className="text-teal-400">'26</span>
+            VideoGuard<span className="text-teal-400">'26</span>
           </span>
         </button>
 

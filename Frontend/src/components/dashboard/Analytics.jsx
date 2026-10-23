@@ -14,11 +14,14 @@ import {
 
 // ─── GSSoC tokens ─────────────────────────────────────────────────────────────
 const G = {
-  teal:    '#0d9488',
-  tealBg:  'rgba(13,148,136,0.08)',
-  tealBdr: 'rgba(13,148,136,0.2)',
+  teal:    '#E87F24',
+  tealBg:  'rgba(232,127,36,0.09)',
+  tealBdr: 'rgba(232,127,36,0.25)',
+  gold:    '#FFC81E',
+  cream:   '#FEFDDF',
+  blue:    '#73A5CA',
   card:    '#ffffff',
-  bg:      '#f6f7fc',
+  bg:      '#fbfbf8',
   border:  'rgba(148,163,184,0.2)',
   text:    '#0f172a',
   sub:     '#64748b',
@@ -157,7 +160,7 @@ const Analytics = () => {
             ⚡ Intelligence Analytics
           </h2>
           <p style={{ fontSize: 12, color: G.sub, margin: '3px 0 0' }}>
-            MediaGuard detection metrics · Live from swarm agents
+            VideoGuard detection metrics · Live from swarm agents
           </p>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>

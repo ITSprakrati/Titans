@@ -40,7 +40,7 @@ from agents.evidence_vault import store_json_artifact as _store_evidence
 import tempfile
 import pathlib
 
-app = FastAPI(title="MediaGuard ML API")
+app = FastAPI(title="VideoGuard AI ML API")
 
 app.add_middleware(
     CORSMiddleware,
@@ -52,7 +52,7 @@ app.add_middleware(
 
 @app.get("/")
 def root_health():
-    return {"status": "ok", "service": "MediaGuard ML Engine", "version": "1.0.0"}
+    return {"status": "ok", "service": "VideoGuard AI ML Engine", "version": "1.0.0"}
 
 # ─── Core Request Models ───────────────────────────────────────────────────────
 class IngestRequest(BaseModel):

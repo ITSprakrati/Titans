@@ -10,26 +10,29 @@ import { useDashboard } from '../../context/DashboardContext';
 import { useSocket } from '../../context/SocketContext';
 
 const G = {
-  teal:    '#0d9488',
-  tealBg:  'rgba(13,148,136,0.08)',
-  tealBdr: 'rgba(13,148,136,0.2)',
+  teal:    '#E87F24',
+  tealBg:  'rgba(232,127,36,0.09)',
+  tealBdr: 'rgba(232,127,36,0.25)',
+  gold:    '#FFC81E',
+  cream:   '#FEFDDF',
+  blue:    '#73A5CA',
   bg:      '#ffffff',
   border:  'rgba(148,163,184,0.15)',
   text:    '#0f172a',
   sub:     '#64748b',
   muted:   '#94a3b8',
-  hover:   '#f1f5f9',
+  hover:   '#FEFDDF',
 };
 
 const navItems = [
-  { id: 'overview',      label: 'Overview',      icon: LayoutDashboard, color: '#0d9488', path: '/dashboard/overview'      },
-  { id: 'vault',         label: 'Asset Vault',   icon: Database,        color: '#6366f1', path: '/dashboard/vault'         },
-  { id: 'hunter',        label: 'Threat Hunter', icon: Search,          color: '#f59e0b', path: '/dashboard/hunter'        },
-  { id: 'incidents',     label: 'Incidents',     icon: ShieldAlert,     color: '#f97316', path: '/dashboard/incidents'     },
-  { id: 'intel',         label: 'Intelligence',  icon: ShieldAlert,     color: '#a855f7', path: '/dashboard/intel'         },
-  { id: 'enforce',       label: 'Enforce & License', icon: Gavel,       color: '#ef4444', path: '/dashboard/enforce'       },
-  { id: 'notifications', label: 'Swarm Logs',    icon: Bell,     color: '#a855f7', path: '/dashboard/notifications' },
-  { id: 'analytics',    label: 'Analytics',     icon: BarChart3,color: '#f59e0b', path: '/dashboard/analytics'    },
+  { id: 'overview',      label: 'Overview',      icon: LayoutDashboard, color: '#E87F24', path: '/dashboard/overview'      },
+  { id: 'vault',         label: 'Asset Vault',   icon: Database,        color: '#E87F24', path: '/dashboard/vault'         },
+  { id: 'hunter',        label: 'Threat Hunter', icon: Search,          color: '#E87F24', path: '/dashboard/hunter'        },
+  { id: 'incidents',     label: 'Incidents',     icon: ShieldAlert,     color: '#E87F24', path: '/dashboard/incidents'     },
+  { id: 'intel',         label: 'Intelligence',  icon: ShieldAlert,     color: '#73A5CA', path: '/dashboard/intel'         },
+  { id: 'enforce',       label: 'Enforce & License', icon: Gavel,       color: '#E87F24', path: '/dashboard/enforce'       },
+  { id: 'notifications', label: 'Swarm Logs',    icon: Bell,     color: '#73A5CA', path: '/dashboard/notifications' },
+  { id: 'analytics',    label: 'Analytics',     icon: BarChart3,color: '#FFC81E', path: '/dashboard/analytics'    },
 ];
 
 const Sidebar = () => {
@@ -76,7 +79,7 @@ const Sidebar = () => {
                   <Shield size={17} style={{ color: G.teal }} />
                 </div>
                 <div>
-                  <p style={{ fontSize: '0.88rem', fontWeight: 800, color: G.text, margin: 0, lineHeight: 1 }}>MediaGuard</p>
+                  <p style={{ fontSize: '0.88rem', fontWeight: 800, color: G.text, margin: 0, lineHeight: 1 }}>VideoGuard</p>
                   <p style={{ fontSize: '0.6rem', color: G.sub, margin: '2px 0 0' }}>AI Control Center</p>
                 </div>
               </NavLink>
@@ -262,7 +265,7 @@ const Sidebar = () => {
                 <div style={{
                   height: '100%', borderRadius: 99, transition: 'width 0.5s',
                   width: backendOnline ? '92%' : '0%',
-                  background: `linear-gradient(to right, ${G.teal}, #2dd4bf)`,
+                  background: `linear-gradient(to right, ${G.teal}, #FFC81E)`,
                 }} />
               </div>
             </div>

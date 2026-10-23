@@ -22,8 +22,8 @@ function App() {
               fontWeight: '600',
             },
             success: {
-              iconTheme: { primary: '#0d9488', secondary: '#ffffff' },
-              style: { borderLeft: '3px solid #0d9488' },
+              iconTheme: { primary: '#E87F24', secondary: '#ffffff' },
+              style: { borderLeft: '3px solid #E87F24' },
             },
             error: {
               iconTheme: { primary: '#ef4444', secondary: '#ffffff' },

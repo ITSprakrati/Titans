@@ -23,9 +23,9 @@ const CobeGlobe = () => {
       mapSamples: 20000,
       mapBrightness: 5,
       mapBaseBrightness: 0.04,
-      baseColor:   [0.04, 0.12, 0.14],
-      markerColor: [0.1, 0.85, 0.75],
-      glowColor:   [0.05, 0.45, 0.42],
+      baseColor:   [0.12, 0.10, 0.08],
+      markerColor: [1.0, 0.78, 0.12],
+      glowColor:   [0.91, 0.50, 0.14],
       scale: 1.05,
       markers: [
         { location: [37.78,  -122.44], size: 0.05 },

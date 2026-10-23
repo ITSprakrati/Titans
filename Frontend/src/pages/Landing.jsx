@@ -276,10 +276,10 @@ const WORDS = ['Detects', 'Adjudicates', 'Monetizes', 'Protects'];
 const Hero = ({ onLaunch }) => (
   <section
     className="relative min-h-screen overflow-hidden pt-24"
-    style={{ background: 'linear-gradient(140deg, #daf2ed 0%, #edf0f8 50%, #e2e8f6 100%)' }}
+    style={{ background: 'linear-gradient(140deg, #FEFDDF 0%, #fdf8e8 45%, #eef4f9 100%)' }}
   >
     <div className="absolute inset-0 pointer-events-none"
-      style={{ backgroundImage: 'radial-gradient(circle, #9abfb8 1px, transparent 1px)', backgroundSize: '26px 26px', opacity: 0.28 }} />
+      style={{ backgroundImage: 'radial-gradient(circle, #E87F24 1px, transparent 1px)', backgroundSize: '26px 26px', opacity: 0.12 }} />
     <RippleGrid rows={10} cols={24} cellSize={60} />
 
     <div className="relative z-10 max-w-7xl mx-auto px-8 lg:px-12 flex flex-col lg:flex-row items-center gap-8 min-h-[calc(100vh-6rem)]">
@@ -297,9 +297,9 @@ const Hero = ({ onLaunch }) => (
           transition={{ delay: 0.08, duration: 0.75, ease: [0.22, 1, 0.36, 1] }}
           className="font-black text-slate-900 tracking-tight leading-[0.9] mb-5"
           style={{ fontSize: 'clamp(2.8rem, 5.5vw, 4.2rem)' }}>
-          MediaGuard<br />Sports<br />
+          VideoGuard<br />AI<br />
           <span className="text-teal-600"
-            style={{ textDecoration: 'underline', textDecorationColor: '#2dd4bf', textDecorationThickness: '4px', textUnderlineOffset: '7px' }}>
+            style={{ textDecoration: 'underline', textDecorationColor: '#FFC81E', textDecorationThickness: '4px', textUnderlineOffset: '7px' }}>
             <FlipWords words={WORDS} />
           </span>
         </motion.h1>
@@ -323,7 +323,7 @@ const Hero = ({ onLaunch }) => (
           className="flex flex-wrap items-center gap-3">
           <motion.button whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.97 }}
             onClick={onLaunch}
-            className="px-7 py-3.5 bg-slate-900 hover:bg-teal-700 text-white font-bold text-sm rounded-full transition-all duration-200 shadow-xl shadow-slate-900/20 flex items-center gap-2">
+            className="px-7 py-3.5 bg-slate-900 hover:bg-teal-500 text-white font-bold text-sm rounded-full transition-all duration-200 shadow-xl shadow-slate-900/20 flex items-center gap-2">
             Launch Swarm <ArrowRight className="w-4 h-4" />
           </motion.button>
           <motion.button whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.97 }}
@@ -345,7 +345,7 @@ const Hero = ({ onLaunch }) => (
         <div className="relative" style={{ width: 520, height: 520 }}>
           {/* Glow */}
           <div className="absolute inset-0 rounded-full pointer-events-none"
-            style={{ background: 'radial-gradient(circle, rgba(20,184,166,0.15) 0%, transparent 70%)' }} />
+            style={{ background: 'radial-gradient(circle, rgba(232,127,36,0.22) 0%, transparent 70%)' }} />
           {/* Globe — centred */}
           <motion.div
             initial={{ opacity: 0, scale: 0.85 }}
@@ -918,9 +918,9 @@ const CTA = ({ onLaunch }) => (
       <motion.div initial={{ opacity: 0, scale: 0.97 }} whileInView={{ opacity: 1, scale: 1 }}
         viewport={{ once: true }} transition={{ duration: 0.65, ease: [0.22, 1, 0.36, 1] }}
         className="relative rounded-[2.5rem] p-14 md:p-20 text-center overflow-hidden"
-        style={{ background: 'linear-gradient(140deg, #daf2ed 0%, #edf0f8 60%, #e2e8f6 100%)' }}>
+        style={{ background: 'linear-gradient(140deg, #FEFDDF 0%, #fef8eb 50%, #eef4f9 100%)' }}>
         <div className="absolute inset-0 pointer-events-none"
-          style={{ backgroundImage: 'radial-gradient(circle, #9abfb8 1px, transparent 1px)', backgroundSize: '24px 24px', opacity: 0.22 }} />
+          style={{ backgroundImage: 'radial-gradient(circle, #E87F24 1px, transparent 1px)', backgroundSize: '24px 24px', opacity: 0.12 }} />
         <RippleGrid rows={6} cols={20} cellSize={52} />
         <div className="absolute bottom-0 right-4 text-[180px] font-black leading-none select-none pointer-events-none"
           style={{ color: 'rgba(148,163,184,0.10)' }}>AI</div>
@@ -971,7 +971,7 @@ const Landing = () => {
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-3">
           <div className="flex items-center gap-2.5">
             <Shield className="w-4 h-4 text-teal-600" />
-            <span className="text-sm font-black text-slate-900">MediaGuard<span className="text-teal-600">Sports</span></span>
+            <span className="text-sm font-black text-slate-900">VideoGuard<span className="text-teal-600">AI</span></span>
           </div>
           <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.28em]">
             © 2026 · Autonomous IP Intelligence · Global Protection Protocol

@@ -13,7 +13,7 @@ import { Shield, ShieldCheck, ExternalLink, Gavel, Coins, Eye, Radio, Loader2 } 
 const SEV = {
   CRITICAL: { color: '#ef4444', bg: 'rgba(239,68,68,0.12)', label: 'CRITICAL' },
   WARNING:  { color: '#f59e0b', bg: 'rgba(245,158,11,0.12)', label: 'WARNING' },
-  INFO:     { color: '#0d9488', bg: 'rgba(13,148,136,0.12)', label: 'INFO' },
+  INFO:     { color: '#73A5CA', bg: 'rgba(115,165,202,0.15)', label: 'INFO' },
 };
 const PLAT_COLOR = {
   YouTube:'#ef4444', TikTok:'#ff0050', 'Twitter/X':'#1da1f2', Twitter:'#1da1f2',

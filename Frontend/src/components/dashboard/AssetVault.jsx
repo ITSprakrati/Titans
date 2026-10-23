@@ -9,11 +9,14 @@ import {
 } from 'lucide-react';
 
 const G = {
-  teal:    '#0d9488',
-  tealBg:  'rgba(13,148,136,0.08)',
-  tealBdr: 'rgba(13,148,136,0.2)',
+  teal:    '#E87F24',
+  tealBg:  'rgba(232,127,36,0.09)',
+  tealBdr: 'rgba(232,127,36,0.25)',
+  gold:    '#FFC81E',
+  cream:   '#FEFDDF',
+  blue:    '#73A5CA',
   card:    '#ffffff',
-  bg:      '#f6f7fc',
+  bg:      '#fbfbf8',
   border:  'rgba(148,163,184,0.2)',
   text:    '#0f172a',
   sub:     '#64748b',
@@ -21,9 +24,9 @@ const G = {
 };
 
 const STATUS_CFG = {
-  complete:    { color: G.teal,    bg: G.tealBg,                  border: G.tealBdr,                  label: 'PROTECTED'   },
-  processing:  { color: '#6366f1', bg: 'rgba(99,102,241,0.08)',   border: 'rgba(99,102,241,0.2)',      label: 'PROCESSING'  },
-  downloading: { color: '#f59e0b', bg: 'rgba(245,158,11,0.08)',   border: 'rgba(245,158,11,0.2)',      label: 'DOWNLOADING' },
+  complete:    { color: '#E87F24', bg: '#FEFDDF',                  border: 'rgba(232,127,36,0.35)',    label: 'PROTECTED'   },
+  processing:  { color: '#73A5CA', bg: 'rgba(115,165,202,0.12)',  border: 'rgba(115,165,202,0.35)',   label: 'PROCESSING'  },
+  downloading: { color: '#FFC81E', bg: 'rgba(255,200,30,0.15)',   border: 'rgba(255,200,30,0.4)',     label: 'DOWNLOADING' },
   failed:      { color: '#ef4444', bg: 'rgba(239,68,68,0.08)',    border: 'rgba(239,68,68,0.2)',       label: 'FAILED'      },
 };
 
@@ -449,8 +452,8 @@ const AssetVault = () => {
       {/* Stats row */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14, marginBottom: 20 }}>
         {[
-          { label: 'Assets Vaulted',  value: assets.length,                                          color: '#6366f1' },
-          { label: 'Total Vectors',   value: totalVectors > 0 ? totalVectors.toLocaleString() : '—', color: '#a855f7' },
+          { label: 'Assets Vaulted',  value: assets.length,                                          color: G.blue    },
+          { label: 'Total Vectors',   value: totalVectors > 0 ? totalVectors.toLocaleString() : '—', color: G.gold    },
           { label: 'Protected',       value: assets.filter(a => a.status === 'complete').length,      color: G.teal    },
         ].map(({ label, value, color }) => (
           <motion.div key={label} whileHover={{ y: -2 }}
@@ -472,8 +475,8 @@ const AssetVault = () => {
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 14 }}>
           <div>
             <h2 style={{ fontSize: 16, fontWeight: 800, color: G.text, margin: '0 0 4px' }}>Ingest Official Content</h2>
-            <p style={{ fontSize: 12, color: G.sub, margin: 0, maxWidth: 480 }}>
-              The Archivist downloads via yt-dlp, extracts 1 frame/sec, embeds each through CLIP (512-dim), and stores vectors in the FAISS vault with a SHA-256 integrity hash.
+            <p style={{ fontSize: 12, color: G.sub, margin: 0, maxWidth: 520 }}>
+              The Archivist downloads via yt-dlp, extracts 1 frame per 30 seconds, embeds each through CLIP (512-dim), and stores vectors in the FAISS vault with a SHA-256 integrity hash.
             </p>
           </div>
           <button onClick={refresh} style={{
@@ -508,9 +511,9 @@ const AssetVault = () => {
                 display: 'flex', alignItems: 'center', gap: 6, padding: '10px 20px',
                 borderRadius: 12, border: 'none', cursor: loading ? 'not-allowed' : 'pointer',
                 fontWeight: 700, fontSize: 13,
-                background: loading ? G.border : `linear-gradient(135deg, ${G.teal}, #2dd4bf)`,
+                background: loading ? G.border : `linear-gradient(135deg, ${G.teal}, #FFC81E)`,
                 color: loading ? G.muted : '#fff',
-                boxShadow: loading ? 'none' : `0 0 20px ${G.teal}25`,
+                boxShadow: loading ? 'none' : `0 0 20px ${G.teal}35`,
                 opacity: (!url.trim() && !loading) ? 0.5 : 1,
               }}>
               {loading ? <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> : <Plus size={14} />}
