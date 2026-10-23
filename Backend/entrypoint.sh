@@ -2,7 +2,7 @@
 set -e
 
 echo "============================================="
-echo "  MediaGuard FastAPI — Container Startup"
+echo "  SportGuard FastAPI — Container Startup"
 echo "============================================="
 
 # ── Download models from GCS if not already present ──────────────────────────
@@ -67,6 +67,20 @@ echo ""
 echo "  Checking model files..."
 echo "  GCS Bucket: ${BUCKET}"
 echo ""
+
+if [ "$LITE_MODE" = "true" ]; then
+    echo "  [LITE_MODE] Skipping best.pth download and ONNX export."
+    if [ -f "${MODEL_DIR}/clip_vision_int8.onnx" ]; then
+        export CLIP_ONNX_PATH="${MODEL_DIR}/clip_vision_int8.onnx"
+    elif [ -f "${MODEL_DIR}/clip_vision.onnx" ]; then
+        export CLIP_ONNX_PATH="${MODEL_DIR}/clip_vision.onnx"
+    fi
+    echo "  Model paths:"
+    echo "    CLIP_ONNX_PATH=${CLIP_ONNX_PATH}"
+    echo "  [LITE_MODE] Starting server immediately..."
+    echo "============================================="
+    exec "$@"
+fi
 
 # Download best.pth (Forensics SND model ~1.12GB)
 download_from_gcs "best.pth" "models/best.pth" 100000000

@@ -727,6 +727,10 @@ def _ensure_model_loaded():
     """Lazy-load the forensics model on first call."""
     global _snd_model, _model_ready
 
+    if os.environ.get("LITE_MODE", "false").lower() == "true":
+        _model_ready = False
+        return False
+
     if _snd_model is not None:
         return _model_ready
 

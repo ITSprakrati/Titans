@@ -40,7 +40,7 @@ from agents.evidence_vault import store_json_artifact as _store_evidence
 import tempfile
 import pathlib
 
-app = FastAPI(title="VideoGuard AI ML API")
+app = FastAPI(title="SportGuard AI ML API")
 
 app.add_middleware(
     CORSMiddleware,
@@ -52,7 +52,7 @@ app.add_middleware(
 
 @app.get("/")
 def root_health():
-    return {"status": "ok", "service": "VideoGuard AI ML Engine", "version": "1.0.0"}
+    return {"status": "ok", "service": "SportGuard AI ML Engine", "version": "1.0.0"}
 
 # ─── Core Request Models ───────────────────────────────────────────────────────
 class IngestRequest(BaseModel):
@@ -812,7 +812,7 @@ def ingest_asset(payload: IngestRequest, background_tasks: BackgroundTasks):
                             f.write(chunk)
 
                 file_size = os.path.getsize(local_path)
-                if file_size < 100_000:
+                if file_size < 10_000:
                     raise ValueError(
                         f"Downloaded file too small ({file_size:,} bytes) — "
                         "likely not a video or download was blocked."

@@ -23,6 +23,8 @@ _ocr_confidence_threshold = 0.5  # Minimum confidence for OCR results
 def _init_ocr():
     """Initialize OCR reader (lazy loading to save memory)."""
     global _ocr_reader, _ocr_initialized
+    if os.environ.get("LITE_MODE", "false").lower() == "true":
+        return
     if _ocr_initialized:
         return
     try:
@@ -51,6 +53,14 @@ def extract_text_from_image(
             - has_subtitles: bool (detects text at bottom of frame)
             - total_confidence: float
     """
+    if os.environ.get("LITE_MODE", "false").lower() == "true":
+        return {
+            "detected_text": [],
+            "text_regions": [],
+            "has_watermark": False,
+            "has_subtitles": False,
+            "total_confidence": 0.0,
+        }
     _init_ocr()
     if not _ocr_initialized or not _ocr_reader:
         return {

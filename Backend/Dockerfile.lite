@@ -1,0 +1,31 @@
+FROM python:3.11-slim
+
+# System deps for OpenCV headless + ffmpeg + Node.js (for yt-dlp YouTube extraction)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libgl1 libglib2.0-0 ffmpeg curl \
+    && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+    && apt-get install -y --no-install-recommends nodejs \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+ENV LITE_MODE=true
+ENV PYTHONUNBUFFERED=1
+
+COPY requirements-lite.txt .
+RUN pip install --no-cache-dir -r requirements-lite.txt
+
+COPY . .
+
+# Copy int8 quantized CLIP model into container (ensures no HuggingFace download needed)
+COPY clip_vision_int8.onnx /app/clip_vision_int8.onnx
+
+ENV CLIP_ONNX_PATH=/app/clip_vision_int8.onnx
+
+EXPOSE 8001
+
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+ENTRYPOINT ["/entrypoint.sh"]
+CMD ["python", "main.py"]

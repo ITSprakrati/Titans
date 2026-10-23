@@ -26,7 +26,8 @@ export const SocketProvider = ({ children }) => {
   const [socketReady, setSocketReady] = useState(false);
 
   useEffect(() => {
-    const SOCKET_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+    const rawUrl = (import.meta.env.VITE_API_URL || 'http://localhost:8000').replace(/\/+$/, '');
+    const SOCKET_URL = rawUrl.replace(/\/api$/, '');
     const sock = io(SOCKET_URL, {
       reconnectionAttempts: 10,
       reconnectionDelay:    1000,

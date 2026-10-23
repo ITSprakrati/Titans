@@ -24,6 +24,13 @@ import sys
 import torch
 import numpy as np
 
+if sys.platform == "win32":
+    try:
+        sys.stdout.reconfigure(encoding="utf-8")
+        sys.stderr.reconfigure(encoding="utf-8")
+    except Exception:
+        pass
+
 def main():
     print("=" * 55)
     print("  CLIP ViT-B/32 → ONNX Export")
@@ -71,22 +78,38 @@ def main():
     # Create dummy input (batch=1, 3 channels, 224x224)
     dummy_input = torch.randn(1, 3, 224, 224)
     
-    print("  Exporting to ONNX (opset 14)...")
+    print("  Exporting to ONNX (opset 18)...")
     print("  This may take 1-2 minutes...\n")
     
-    torch.onnx.export(
-        encoder,
-        dummy_input,
-        output_path,
-        opset_version=14,
-        input_names=["pixel_values"],
-        output_names=["embeddings"],
-        dynamic_axes={
-            "pixel_values": {0: "batch_size"},
-            "embeddings": {0: "batch_size"},
-        },
-        do_constant_folding=True,
-    )
+    try:
+        torch.onnx.export(
+            encoder,
+            dummy_input,
+            output_path,
+            opset_version=18,
+            input_names=["pixel_values"],
+            output_names=["embeddings"],
+            dynamic_axes={
+                "pixel_values": {0: "batch_size"},
+                "embeddings": {0: "batch_size"},
+            },
+            do_constant_folding=True,
+            dynamo=False,
+        )
+    except TypeError:
+        torch.onnx.export(
+            encoder,
+            dummy_input,
+            output_path,
+            opset_version=18,
+            input_names=["pixel_values"],
+            output_names=["embeddings"],
+            dynamic_axes={
+                "pixel_values": {0: "batch_size"},
+                "embeddings": {0: "batch_size"},
+            },
+            do_constant_folding=True,
+        )
     
     size_mb = os.path.getsize(output_path) / 1e6
     print(f"  ✓ Exported: clip_vision.onnx ({size_mb:.1f}MB)")

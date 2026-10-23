@@ -520,15 +520,35 @@ npm run dev
 
 ## Deployment
 
-### Current Setup
+### 1-Click Render Blueprint Deployment (Recommended)
+
+The repository includes a unified [`render.yaml`](./render.yaml) blueprint that deploys all three services together:
+1. **`sportguard-ml`**: Python FastAPI ML Engine running in **Lite Mode** (`Dockerfile.lite`, ~240MB peak RAM, perfectly fitting Render's free 512MB tier).
+2. **`sportguard-api`**: Node.js Express Orchestrator and WebSocket server.
+3. **`sportguard-web`**: React + Vite SPA static site.
+
+#### Steps to Deploy on Render:
+1. Push your changes to GitHub.
+2. In the [Render Dashboard](https://dashboard.render.com), click **New +** > **Blueprint**.
+3. Select your repository (`Titans`).
+4. Fill in the required environment secrets when prompted:
+   - `GROQ_API_KEY`: Groq API key for ultra-fast LLM adjudication.
+   - `GEMINI_API_KEY`: Gemini API key for deep fair use legal reasoning.
+   - `MONGO_URI`: MongoDB Atlas connection string.
+   - `YOUTUBE_COOKIES_B64`: *(Optional)* Base64-encoded `cookies.txt` for YouTube downloads.
+5. Click **Apply**. Render will build and deploy all three services automatically.
+
+---
+
+### Alternative / Manual Setup
 
 | Service | Platform |
 |---|---|
-| Frontend | Firebase Hosting |
-| Node.js API | Render (or any Node.js host) |
-| FastAPI ML | Render (or any Python host) |
+| Frontend | Render Static Site or Firebase Hosting |
+| Node.js API | Render Web Service (Node.js) |
+| FastAPI ML | Render Web Service (Docker - `Dockerfile.lite`) |
 | Database | MongoDB Atlas |
-| Cache | Redis Cloud (Upstash) |
+| Cache | Redis Cloud / Upstash (Optional) |
 
 ### Firebase Hosting (Frontend)
 ```bash

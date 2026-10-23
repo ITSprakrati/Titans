@@ -9,10 +9,13 @@ __pycache__/
 .env
 .env.*
 !.env.example
+*.env
 
 # Downloaded videos and local stores
 assets/official/
 assets/suspects/
+assets/
+mediaguard_jobs/
 *.mp4
 *.webm
 
@@ -21,13 +24,14 @@ vault/
 *.faiss
 *.pkl
 
-# Model files (too large for git — store on GCS/Drive)
+# Model files (too large for git - store on GCS/Drive)
 best.pth
 clip_vision.onnx
 clip_vision.onnx.data
 *.pth
 *.onnx
 *.onnx.data
+!clip_vision_int8.onnx
 
 # Evidence vault (local storage, not committed)
 evidence_vault/

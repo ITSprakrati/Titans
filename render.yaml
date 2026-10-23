@@ -1,21 +1,66 @@
 services:
+  # ---------------------------------------------------------------------------
+  # 1. SportGuard ML Engine (FastAPI Lite Mode)
+  # ---------------------------------------------------------------------------
   - type: web
     name: sportguard-ml
     runtime: docker
     dockerContext: ./Backend
-    dockerfilePath: ./Backend/Dockerfile.fastapi
-    plan: standard
+    dockerfilePath: ./Backend/Dockerfile.lite
+    plan: free
     healthCheckPath: /
     envVars:
+      - key: LITE_MODE
+        value: "true"
       - key: PORT
         value: 8001
       - key: INGEST_SAMPLE_SEC
         value: "1.0"
       - key: CLIP_BATCH_SIZE
-        value: "4"
+        value: "2"
       - key: WATCHDOG_ENABLED
         value: "false"
       - key: GROQ_API_KEY
         sync: false
       - key: GEMINI_API_KEY
         sync: false
+      - key: YOUTUBE_COOKIES_B64
+        sync: false
+
+  # ---------------------------------------------------------------------------
+  # 2. SportGuard API (Node.js Express)
+  # ---------------------------------------------------------------------------
+  - type: web
+    name: sportguard-api
+    runtime: node
+    rootDir: ./Backend/server
+    plan: free
+    buildCommand: npm install
+    startCommand: node app.js
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: FASTAPI_URL
+        value: https://sportguard-ml.onrender.com
+      - key: CLIENT_URL
+        value: https://sportguard-web.onrender.com
+      - key: MONGO_URI
+        sync: false
+
+  # ---------------------------------------------------------------------------
+  # 3. SportGuard Web (React + Vite SPA)
+  # ---------------------------------------------------------------------------
+  - type: web
+    name: sportguard-web
+    runtime: static
+    rootDir: Frontend
+    buildCommand: npm install && npm run build
+    staticPublishPath: dist
+    envVars:
+      - key: VITE_API_URL
+        value: https://sportguard-api.onrender.com
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html

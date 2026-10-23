@@ -48,22 +48,27 @@ Memory management for Render 512MB:
   - Weights pre-downloaded at Docker build time
 """
 
+import os
+import sys
+import json
+import numpy as np
+from PIL import Image
+
 try:
     import cv2
 except ImportError:
     cv2 = None
 
-try:
-    import torch
-except ImportError:
-    torch = None
+LITE_MODE = os.environ.get("LITE_MODE", "false").lower() == "true"
+
+torch = None
+if not LITE_MODE:
+    try:
+        import torch
+    except ImportError:
+        torch = None
 
 from agents.faiss_compat import faiss, _NumpyVectorVault
-
-import numpy as np
-import json
-import os
-from PIL import Image
 
 VAULT_DIR = os.path.join(os.path.dirname(__file__), "..", "vault")
 os.makedirs(VAULT_DIR, exist_ok=True)
@@ -78,54 +83,104 @@ _processor = None
 _clip      = None
 _USE_HALF  = False
 
-# ─── ONNX inference (C1 fix) ──────────────────────────────────────────────────
-# When clip_vision.onnx is present, use ONNX Runtime instead of PyTorch.
-# ONNX Runtime on CPU: ~50-80ms/image vs PyTorch: ~760ms/image = 10-15x speedup.
+# ─── Pure numpy/Pillow Preprocessing for LITE_MODE ────────────────────────────
+def _preprocess_image_lite(pil_img: Image.Image) -> np.ndarray:
+    """
+    Pure numpy/Pillow CLIP ViT-B/32 preprocessing (no PyTorch / transformers):
+    1. Resize shortest side to 224 bicubic
+    2. Center crop 224x224
+    3. Scale float32 to [0, 1]
+    4. Normalize mean [0.4815, 0.4578, 0.4082], std [0.2686, 0.2613, 0.2758]
+    5. Transpose to CHW (3, 224, 224)
+    """
+    if pil_img.mode != "RGB":
+        pil_img = pil_img.convert("RGB")
+    w, h = pil_img.size
+    if w < h:
+        new_w = 224
+        new_h = int(round(h * (224.0 / w)))
+    else:
+        new_h = 224
+        new_w = int(round(w * (224.0 / h)))
+    pil_img = pil_img.resize((new_w, new_h), resample=Image.BICUBIC)
+    left = (new_w - 224) // 2
+    top = (new_h - 224) // 2
+    pil_img = pil_img.crop((left, top, left + 224, top + 224))
+
+    arr = np.array(pil_img, dtype=np.float32) / 255.0
+    mean = np.array([0.4815, 0.4578, 0.4082], dtype=np.float32)
+    std  = np.array([0.2686, 0.2613, 0.2758], dtype=np.float32)
+    arr = (arr - mean) / std
+    return arr.transpose(2, 0, 1).astype(np.float32)
+
+# ─── ONNX inference ───────────────────────────────────────────────────────────
 _onnx_session  = None
 _onnx_enabled  = False
 
-# ONNX model path: env var or default next to agents/ dir
+_DEFAULT_ONNX = "clip_vision_int8.onnx" if LITE_MODE else "clip_vision.onnx"
 _ONNX_PATH = os.environ.get(
     "CLIP_ONNX_PATH",
-    os.path.join(os.path.dirname(__file__), "..", "clip_vision.onnx"),
+    os.path.join(os.path.dirname(__file__), "..", _DEFAULT_ONNX),
 )
+if not os.path.exists(_ONNX_PATH):
+    _fallback_onnx = os.path.join(os.path.dirname(__file__), "..", "clip_vision.onnx" if LITE_MODE else "clip_vision_int8.onnx")
+    if os.path.exists(_fallback_onnx):
+        _ONNX_PATH = _fallback_onnx
 
 def _try_load_onnx() -> bool:
     """
     Try to load ONNX Runtime session for CLIP inference.
     Returns True if ONNX is available and loaded, False otherwise.
-    Called once at module load time — silent failure, falls back to PyTorch.
     """
-    global _onnx_session, _onnx_enabled
+    global _onnx_session, _onnx_enabled, _ONNX_PATH
     if _onnx_enabled:
         return True
-    if not os.path.exists(_ONNX_PATH):
+    
+    candidates = []
+    if LITE_MODE:
+        candidates = [
+            os.environ.get("CLIP_ONNX_PATH", ""),
+            os.path.join(os.path.dirname(__file__), "..", "clip_vision_int8.onnx"),
+            os.path.join(os.path.dirname(__file__), "..", "clip_vision.onnx"),
+        ]
+    else:
+        candidates = [
+            os.environ.get("CLIP_ONNX_PATH", ""),
+            os.path.join(os.path.dirname(__file__), "..", "clip_vision.onnx"),
+            os.path.join(os.path.dirname(__file__), "..", "clip_vision_int8.onnx"),
+        ]
+
+    valid_path = None
+    for c in candidates:
+        if c and os.path.exists(c):
+            valid_path = c
+            break
+
+    if not valid_path:
         return False
+
     try:
         import onnxruntime as ort
         sess_opts = ort.SessionOptions()
         sess_opts.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
         sess_opts.intra_op_num_threads = min(4, os.cpu_count() or 4)
         _onnx_session = ort.InferenceSession(
-            _ONNX_PATH,
+            valid_path,
             sess_options = sess_opts,
             providers    = ["CPUExecutionProvider"],
         )
         _onnx_enabled = True
-        print(f"[Archivist] CLIP ONNX loaded — {_ONNX_PATH}")
+        _ONNX_PATH = valid_path
+        print(f"[Archivist] CLIP ONNX loaded (LITE_MODE={LITE_MODE}) — {_ONNX_PATH}")
         return True
     except Exception as e:
-        print(f"[Archivist] ONNX load failed ({e}), using PyTorch fallback")
+        print(f"[Archivist] ONNX load failed ({e}), using fallback")
         return False
 
-# Attempt ONNX load at import time (non-blocking, zero cost if file absent)
 _try_load_onnx()
 
 EMBEDDING_DIM = 512
-
-# ONNX doesn't benefit from large batches on CPU (no GPU parallelism).
-# Optimal ONNX batch = 1-4. PyTorch benefits from batch=8-16.
-BATCH_SIZE = int(os.environ.get("CLIP_BATCH_SIZE", "4" if _onnx_enabled else "16"))
+BATCH_SIZE = int(os.environ.get("CLIP_BATCH_SIZE", "2" if LITE_MODE else ("4" if _onnx_enabled else "16")))
 
 SCENE_HIST_THRESHOLD       = 0.35
 TEMPORAL_WINDOW            = 5
@@ -134,12 +189,16 @@ INGEST_SAMPLE_SEC          = float(os.environ.get("INGEST_SAMPLE_SEC", "1.0"))
 
 
 def _load_clip():
-    """Load CLIP PyTorch model — only called if ONNX unavailable."""
+    """Load CLIP PyTorch model — in LITE_MODE only ONNX is loaded; PyTorch/transformers are never touched."""
     global _processor, _clip, _USE_HALF
+    if LITE_MODE:
+        _try_load_onnx()
+        return
+
     if _clip is not None:
         return
     if _onnx_enabled:
-        # ONNX handles inference — still need processor for preprocessing
+        # ONNX handles inference — still need processor for preprocessing in full mode
         from transformers import CLIPProcessor
         if _processor is None:
             _processor = CLIPProcessor.from_pretrained(_MODEL_ID)
@@ -149,7 +208,7 @@ def _load_clip():
     print("[Archivist] Loading CLIP ViT-B/32 (lazy, float16)...")
     _processor = CLIPProcessor.from_pretrained(_MODEL_ID)
     try:
-        _clip     = CLIPModel.from_pretrained(_MODEL_ID, torch_dtype=torch.float16)
+        _clip     = CLIPModel.from_pretrained(_MODEL_ID, torch_dtype=torch.float16 if torch else None)
         _USE_HALF = True
         print("[Archivist] CLIP loaded in float16 — ~175MB RAM")
     except Exception:
@@ -445,29 +504,36 @@ def _embed_batch(pil_images: list) -> np.ndarray:
     Embed a batch of PIL images via CLIP ViT-B/32.
     Returns float32 array of shape (N, 512), L2-normalised.
 
-    FIX C1: Uses ONNX Runtime when clip_vision.onnx is present (10-15x faster on CPU).
-    Falls back to PyTorch automatically if ONNX unavailable.
+    In LITE_MODE: uses pure numpy/Pillow preprocessing + int8 ONNX (no torch/transformers).
+    In full mode: uses ONNX Runtime if available, else PyTorch fallback.
     """
     try:
-        _load_clip()   # ensures _processor is loaded (needed for both paths)
+        _load_clip()
 
-        # ── ONNX inference path (fast) ────────────────────────────────────────────
-        if _onnx_enabled and _onnx_session is not None and _processor is not None:
-            inputs  = _processor(
-                text   = ["dummy"] * len(pil_images),
-                images = pil_images,
-                return_tensors = "pt",
-                padding        = True,
-            )
-            pv = inputs["pixel_values"].float().numpy()   # (N, 3, 224, 224) float32
+        # ── ONNX inference path (fast & memory-light) ────────────────────────────
+        if _onnx_enabled and _onnx_session is not None:
+            if LITE_MODE or _processor is None:
+                pv = np.stack([_preprocess_image_lite(img) for img in pil_images], axis=0).astype(np.float32)
+            else:
+                inputs = _processor(
+                    text   = ["dummy"] * len(pil_images),
+                    images = pil_images,
+                    return_tensors = "np",
+                    padding        = True,
+                )
+                pv = inputs["pixel_values"].astype(np.float32)
+
             embeddings = _onnx_session.run(
                 ["embeddings"],
                 {"pixel_values": pv},
-            )[0]   # (N, 512) float32, already L2-normalised by wrapper
-            return embeddings.astype("float32")
+            )[0]
+            # Ensure L2 normalization
+            norm = np.linalg.norm(embeddings, axis=-1, keepdims=True)
+            norm[norm == 0] = 1.0
+            return (embeddings / norm).astype("float32")
 
-        # ── PyTorch fallback ──────────────────────────────────────────────────────
-        if _clip is not None and _processor is not None and torch is not None:
+        # ── PyTorch fallback (full mode only) ────────────────────────────────────
+        if not LITE_MODE and _clip is not None and _processor is not None and torch is not None:
             inputs = _processor(
                 text   = ["dummy"] * len(pil_images),
                 images = pil_images,

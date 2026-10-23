@@ -8,7 +8,10 @@ pnpm-debug.log*
 lerna-debug.log*
 
 node_modules
+Frontend/node_modules/
+Backend/server/node_modules/
 dist
+Frontend/dist/
 dist-ssr
 *.local
 
@@ -16,6 +19,7 @@ dist-ssr
 .env
 .env.*
 !.env.example
+*.env
 
 # Editor directories and files
 .vscode/*
@@ -32,25 +36,34 @@ dist-ssr
 __pycache__/
 *.pyc
 .venv/
+Backend/.venv/
 venv/
 
-# ML artifacts & model files (too large for git — stored on GCS)
+# ML artifacts & model files (too large for git - stored on GCS)
 *.mp4
 *.faiss
 *.pkl
 *.pth
+best.pth
+Backend/best.pth
+clip_vision.onnx
+Backend/clip_vision.onnx
 *.onnx
 *.onnx.data
+!Backend/clip_vision_int8.onnx
 Backend/assets/
 Backend/assets/official/
+Backend/mediaguard_jobs/
+mediaguard_jobs/
 
-# Evidence vault (runtime artifacts — not source code)
+# Evidence vault (runtime artifacts - not source code)
 Backend/evidence_vault/
 Backend/vault/
+vault/
 Backend/server/data/memory_store.json
 Backend/server/data/*.json
 
-# YouTube cookies — contains session tokens, never commit
+# YouTube cookies - contains session tokens, never commit
 Backend/cookies.txt
 Backend/yt_cookies.txt
 
