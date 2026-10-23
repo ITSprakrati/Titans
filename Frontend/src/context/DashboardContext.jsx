@@ -36,8 +36,8 @@ export const DashboardProvider = ({ children }) => {
   const [liveMonitorActive, setLiveMonitorActive] = useState(false);
 
   const [stats, setStats] = useState({
-    totalDetections:  DEMO_INCIDENTS.length,
-    criticalThreats:  DEMO_INCIDENTS.filter(i => i.severity === 'CRITICAL').length,
+    totalDetections:  0,
+    criticalThreats:  0,
     revenueProtected: 0,
     assetsInVault:    0,
   });

@@ -9,18 +9,30 @@ const STORE_PATH = path.resolve(__dirname, "../data/memory_store.json");
 
 function loadFromDisk() {
   try {
-    if (fs.existsSync(STORE_PATH)) {
-      const raw = fs.readFileSync(STORE_PATH, "utf8").replace(/^\uFEFF/, "");
-      const parsed = JSON.parse(raw);
-      return {
-        incidents: Array.isArray(parsed.incidents) ? parsed.incidents : [],
-        huntJobs: Array.isArray(parsed.huntJobs) ? parsed.huntJobs : [],
-        dmcaRecords: Array.isArray(parsed.dmcaRecords) ? parsed.dmcaRecords : [],
-        contractRecords: Array.isArray(parsed.contractRecords) ? parsed.contractRecords : [],
-        ingestedAssets: Array.isArray(parsed.ingestedAssets) ? parsed.ingestedAssets : [],
-        accounts: Array.isArray(parsed.accounts) ? parsed.accounts : [],
+    const dir = path.dirname(STORE_PATH);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    if (!fs.existsSync(STORE_PATH)) {
+      const initial = {
+        incidents: [],
+        huntJobs: [],
+        dmcaRecords: [],
+        contractRecords: [],
+        ingestedAssets: [],
+        accounts: [],
       };
+      fs.writeFileSync(STORE_PATH, JSON.stringify(initial, null, 2), "utf8");
+      return initial;
     }
+    const raw = fs.readFileSync(STORE_PATH, "utf8").replace(/^\uFEFF/, "");
+    const parsed = JSON.parse(raw);
+    return {
+      incidents: Array.isArray(parsed.incidents) ? parsed.incidents : [],
+      huntJobs: Array.isArray(parsed.huntJobs) ? parsed.huntJobs : [],
+      dmcaRecords: Array.isArray(parsed.dmcaRecords) ? parsed.dmcaRecords : [],
+      contractRecords: Array.isArray(parsed.contractRecords) ? parsed.contractRecords : [],
+      ingestedAssets: Array.isArray(parsed.ingestedAssets) ? parsed.ingestedAssets : [],
+      accounts: Array.isArray(parsed.accounts) ? parsed.accounts : [],
+    };
   } catch (err) {
     console.error("[memoryStore] Could not load persisted data:", err.message);
   }

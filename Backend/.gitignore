@@ -35,6 +35,8 @@ evidence_vault/
 # Node
 server/node_modules/
 server/package-lock.json
+server/data/memory_store.json
+server/data/*.json
 
 # OS / IDE
 .DS_Store
