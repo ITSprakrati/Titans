@@ -73,7 +73,7 @@ const CTASection = ({ onLaunch }) => (
         transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
       >
         <p className="text-[9px] font-bold text-[#E87F24] uppercase tracking-[0.3em] mb-4">
-          Autonomous IP Intelligence · VideoGuard AI
+          Sports IP Protection · SportGuard AI
         </p>
         <h2 className="text-5xl md:text-6xl font-black text-slate-900 tracking-tight mb-6 leading-tight">
           Protect What<br /><span className="text-teal-600">Belongs to You.</span>

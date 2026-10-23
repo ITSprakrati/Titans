@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: sportguard-ml
+    runtime: docker
+    dockerContext: ./Backend
+    dockerfilePath: ./Backend/Dockerfile.fastapi
+    plan: standard
+    healthCheckPath: /
+    envVars:
+      - key: PORT
+        value: 8001
+      - key: INGEST_SAMPLE_SEC
+        value: "1.0"
+      - key: CLIP_BATCH_SIZE
+        value: "4"
+      - key: WATCHDOG_ENABLED
+        value: "false"
+      - key: GROQ_API_KEY
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false

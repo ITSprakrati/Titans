@@ -32,6 +32,7 @@ dist-ssr
 __pycache__/
 *.pyc
 .venv/
+venv/
 
 # ML artifacts & model files (too large for git — stored on GCS)
 *.mp4
@@ -40,6 +41,7 @@ __pycache__/
 *.pth
 *.onnx
 *.onnx.data
+Backend/assets/
 Backend/assets/official/
 
 # Evidence vault (runtime artifacts — not source code)

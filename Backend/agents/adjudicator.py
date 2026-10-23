@@ -8,7 +8,7 @@ import time
 import logging
 from dotenv import load_dotenv
 
-load_dotenv()
+load_dotenv(os.path.join(os.path.dirname(__file__), "..", ".env"))
 
 logger = logging.getLogger(__name__)
 
@@ -24,39 +24,54 @@ def _is_quota(e: Exception) -> bool:
 
 def _call_llm(prompt: str) -> str:
     """
-    Try Groq first (llama-3.1-8b-instant — 20k TPM),
-    fall back to Groq 70b, then Gemini 2.0-flash-lite.
+    Try Groq first (OpenAI-compatible REST API),
+    fall back to Gemini 2.0-flash-lite.
     """
     groq_key   = os.getenv("GROQ_API_KEY",   "").strip()
     gemini_key = os.getenv("GEMINI_API_KEY",  "").strip()
 
     # ── Attempt 1 & 2: Groq ──────────────────────────────────────────────────
     if groq_key:
-        from groq import Groq
-        client = Groq(api_key=groq_key)
-
-        for model, delay in [
-            ("llama-3.1-8b-instant",    0),
-            ("llama-3.3-70b-versatile", 15),
-        ]:
+        import requests
+        models = [
+            "openai/gpt-oss-20b",
+            "openai/gpt-oss-120b",
+            "llama-3.1-8b-instant",
+            "llama-3.3-70b-versatile",
+        ]
+        headers = {
+            "Authorization": f"Bearer {groq_key}",
+            "Content-Type": "application/json",
+        }
+        for model in models:
             try:
-                if delay:
-                    logger.warning(f"[Adjudicator] Groq rate limit — retrying with {model} in {delay}s…")
-                    time.sleep(delay)
-                resp = client.chat.completions.create(
-                    model=model,
-                    messages=[
+                payload = {
+                    "model": model,
+                    "messages": [
                         {"role": "system", "content": "You are a strict IP law AI. Output ONLY valid JSON. No markdown, no explanation."},
                         {"role": "user",   "content": prompt},
                     ],
-                    temperature=0.1,
-                    max_tokens=512,
+                    "temperature": 0.1,
+                    "max_tokens": 512,
+                }
+                resp = requests.post(
+                    "https://api.groq.com/openai/v1/chat/completions",
+                    headers=headers,
+                    json=payload,
+                    timeout=15,
                 )
-                return resp.choices[0].message.content.strip()
+                if resp.status_code == 200:
+                    data = resp.json()
+                    return data["choices"][0]["message"]["content"].strip()
+                elif resp.status_code == 429:
+                    logger.warning(f"[Adjudicator] Groq quota on {model} — trying next model…")
+                    continue
+                else:
+                    logger.warning(f"[Adjudicator] Groq {model} returned {resp.status_code}: {resp.text[:120]}")
+                    continue
             except Exception as e:
-                if _is_quota(e):
-                    continue   # try next model
-                raise          # non-quota error — propagate
+                logger.warning(f"[Adjudicator] Groq {model} error: {e}")
+                continue
 
     # ── Attempt 3: Gemini fallback ────────────────────────────────────────────
     if gemini_key:

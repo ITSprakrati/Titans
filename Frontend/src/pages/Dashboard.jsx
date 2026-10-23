@@ -39,7 +39,7 @@ const DashboardContent = () => {
   const title     = TITLES[activeTab] || 'Command Center';
 
   // Live stream detection alerts — floating notifications
-  const { liveStreams, liveMonitorActive, setLiveMonitorActive } = useDashboard();
+  const { liveStreams, liveMonitorActive, setLiveMonitorActive, backendOnline, isDemoMode } = useDashboard();
   const { eventLog } = useSocket();
   const [streamAlerts, setStreamAlerts] = useState([]);
   const [liveScreenDismissed, setLiveScreenDismissed] = useState(false);
@@ -125,6 +125,24 @@ const DashboardContent = () => {
         <Header title={title} />
 
         <main className="flex-1 p-6 overflow-y-auto">
+          {(!backendOnline || isDemoMode) && (
+            <div style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              padding: '10px 16px', marginBottom: 16, borderRadius: 12,
+              background: 'rgba(239, 68, 68, 0.08)', border: '1px solid rgba(239, 68, 68, 0.25)',
+              color: '#b91c1c', fontSize: '0.82rem', fontWeight: 600,
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontSize: '1rem' }}>⚠️</span>
+                <span>
+                  <strong>Python ML Service / Node.js Backend Unavailable:</strong> Operating in offline reference mode. Live video ingestion and detection swarm require the remote ML service to be active.
+                </span>
+              </div>
+              <span style={{ fontSize: '0.72rem', background: 'rgba(239, 68, 68, 0.15)', padding: '3px 8px', borderRadius: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                Offline Fallback
+              </span>
+            </div>
+          )}
           <AnimatePresence mode="wait">
             <motion.div
               key={location.pathname}

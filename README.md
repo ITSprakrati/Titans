@@ -1,6 +1,7 @@
-# VideoGuard AI — Autonomous Video IP Protection Platform
+# SportGuard AI — Sports IP Protection & Anti-Piracy Swarm
 
-> **VideoGuard AI** is a production-ready, six-agent AI swarm that autonomously hunts pirated video content across the internet, classifies each incident under IP law, and either dispatches a DMCA takedown or deploys a revenue-sharing smart contract — with human approval required only at the final step.
+> **SportGuard AI** — **Detect. Verify. Protect.**  
+> An autonomous multi-agent AI system designed to protect live sports broadcasts, exclusive match footage, and athletic content rights holders. It continuously monitors external platforms, creates multi-layer visual and acoustic fingerprints, verifies infringements under copyright law, and coordinates rapid enforcement with cryptographically verifiable evidence.
 
 ---
 
@@ -24,14 +25,14 @@
 
 ## Overview
 
-VideoGuard AI automates the full lifecycle of video copyright enforcement:
+SportGuard AI automates the sports IP protection lifecycle:
 
-1. **Ingest** — Register official content into a FAISS fingerprint vault (1 frame extracted per 30 seconds, embedded via CLIP ViT-B/32)
-2. **Hunt** — Spider agent crawls YouTube and other platforms using AI-generated OSINT queries
-3. **Detect** — Sentinel agent performs dual-layer visual fingerprinting (CLIP cosine similarity + pHash cross-check)
-4. **Adjudicate** — LLM-powered legal classification (SEVERE PIRACY / FAIR USE / FAN CONTENT)
-5. **Enforce** — Enforcer drafts tiered DMCA takedown notices (human approval to send)
-6. **Monetize** — Broker mints revenue-sharing smart contracts for fair-use content
+1. **Ingest (Archivist)** — Ingest official sports footage into a FAISS fingerprint vault using scene-aware sampling, perspective correction for screen recordings, CLIP ViT-B/32 embeddings, and audio fingerprinting.
+2. **Hunt (Spider)** — Crawl streaming and video platforms using automated OSINT queries targeting live restreamers and match re-uploaders.
+3. **Detect (Sentinel)** — 5-layer content verification: CLIP visual embeddings, perceptual hashing (pHash), Temporal DNA sequence matching, Chroma audio hashing, and forensic source reconstruction.
+4. **Adjudicate (Adjudicator)** — AI legal reasoning evaluates fair use vs. severe infringement under copyright law.
+5. **Enforce (Enforcer)** — Draft legally compliant DMCA takedowns with SHA-256 sealed custody proof (human-in-the-loop approval required).
+6. **Monetize (Broker)** — Mint revenue-sharing smart contracts for fan commentary and transformative sports content.
 
 ---
 
@@ -67,11 +68,11 @@ The Archivist is the ingestion agent. It fingerprints official video content and
 **How it works:**
 1. Downloads the official video via `yt-dlp` (supports YouTube, Google Drive, direct `.mp4`/`.webm`, Dropbox, S3, CloudFront)
 2. Converts Google Drive share URLs to direct download URLs automatically
-3. **Extracts 1 frame every 30 seconds** (configurable via `SAMPLE_EVERY_N_SECS`)
-4. Resizes each frame to 224px before embedding (reduces memory footprint)
-5. Embeds frames in batches of 32 via **CLIP ViT-B/32** (512-dim, L2-normalised)
-6. Stores vectors in `IndexFlatIP(512)` FAISS vault with a SHA-256 integrity hash
-7. Writes job state atomically to disk (survives process restarts)
+3. **Extracts scene-boundary frames at 1-second intervals** (configurable via `INGEST_SAMPLE_SEC`, with minimum frame fallback)
+4. Detects off-screen recordings (Canny edge & contour analysis) and applies 4-point perspective dewarping
+5. Embeds frames in batches via **CLIP ViT-B/32** (512-dim, L2-normalised; ONNX accelerated when available)
+6. Simultaneously extracts 16kHz audio for Chroma & Mel-spectrogram acoustic fingerprinting
+7. Stores vectors in `IndexFlatIP(512)` FAISS vault and builds Temporal DNA signatures
 
 **Poll endpoint:** `GET /ingest/status/{job_id}` → `downloading` → `processing` → `complete` / `failed`
 

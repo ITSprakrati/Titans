@@ -111,7 +111,7 @@ const HeroSection = ({ onLaunch }) => (
         >
           <span className="w-1.5 h-1.5 rounded-full bg-[#E87F24] animate-pulse" />
           <span className="text-[9px] font-bold text-[#E87F24] uppercase tracking-[0.22em]">
-            Autonomous IP Protection
+            Sports IP Rights Protection
           </span>
         </motion.div>
 
@@ -123,7 +123,7 @@ const HeroSection = ({ onLaunch }) => (
           className="font-black text-slate-900 tracking-tight leading-[0.92] mb-5"
           style={{ fontSize: 'clamp(2.8rem, 5.5vw, 4.2rem)' }}
         >
-          VideoGuard<br />AI<br />
+          SportGuard<br />AI<br />
           <FlipWords />
         </motion.h1>
 
@@ -133,7 +133,7 @@ const HeroSection = ({ onLaunch }) => (
           transition={{ delay: 0.22, duration: 0.6 }}
           className="text-[14px] font-bold text-[#E87F24] mb-4 tracking-wide uppercase"
         >
-          Detect · Adjudicate · Monetize
+          Detect · Verify · Protect
         </motion.p>
 
         <motion.p
@@ -142,9 +142,9 @@ const HeroSection = ({ onLaunch }) => (
           transition={{ delay: 0.32, duration: 0.6 }}
           className="text-slate-500 leading-relaxed mb-10 text-[15px] max-w-[430px]"
         >
-          A six-agent AI swarm that autonomously hunts pirated sports content across the global web,
-          classifies each incident under IP law, then either dispatches a DMCA takedown or deploys
-          a revenue-sharing smart contract — human approval only at the final step.
+          An autonomous AI swarm that monitors sports broadcasts and exclusive footage across the web,
+          verifies infringements with multi-layer visual and audio fingerprinting, and equips rights
+          holders with cryptographically verified evidence for immediate enforcement.
         </motion.p>
 
         {/* CTAs */}

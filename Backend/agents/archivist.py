@@ -130,7 +130,7 @@ BATCH_SIZE = int(os.environ.get("CLIP_BATCH_SIZE", "4" if _onnx_enabled else "16
 SCENE_HIST_THRESHOLD       = 0.35
 TEMPORAL_WINDOW            = 5
 SCREEN_EDGE_DENSITY_THRESHOLD = 0.12
-INGEST_SAMPLE_SEC          = float(os.environ.get("INGEST_SAMPLE_SEC", "30.0"))
+INGEST_SAMPLE_SEC          = float(os.environ.get("INGEST_SAMPLE_SEC", "1.0"))
 
 
 def _load_clip():
@@ -714,10 +714,27 @@ def tool_ingest_video(video_path: str) -> str:
     else:
         fps          = cap.get(cv2.CAP_PROP_FPS) or 25.0
         total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-        SAMPLE_INTERVAL = max(1, int(fps * INGEST_SAMPLE_SEC))
+        duration_sec = total_frames / fps if fps > 0 else 0
+
+        # Adaptive sampling: scale interval with video length to prevent 30-min timeouts on long broadcasts
+        env_sample = float(os.environ.get("INGEST_SAMPLE_SEC", "0"))
+        if env_sample > 0:
+            sample_sec = env_sample
+        elif duration_sec <= 45.0:
+            sample_sec = 1.0   # short sports clip / play
+        elif duration_sec <= 180.0:
+            sample_sec = 2.0   # 1-3 min clip
+        elif duration_sec <= 600.0:
+            sample_sec = 3.0   # 3-10 min highlights
+        else:
+            sample_sec = 6.0   # full broadcast / match
+
+        SAMPLE_INTERVAL = max(1, int(fps * sample_sec))
 
         total_samples = int(total_frames / SAMPLE_INTERVAL) if SAMPLE_INTERVAL > 0 else 0
-        print(f"[Archivist] Seek-sampling {total_samples} positions ({INGEST_SAMPLE_SEC}s intervals)")
+        if total_frames > 0 and total_samples == 0:
+            total_samples = 1
+        print(f"[Archivist] Seek-sampling {total_samples} positions ({sample_sec:.1f}s interval, dur={duration_sec:.1f}s)")
         prev_hist = None
 
         for sample_idx in range(total_samples):
@@ -759,19 +776,18 @@ def tool_ingest_video(video_path: str) -> str:
         _flush_batch()
 
     # ── Minimum Frame Guarantee ───────────────────────────────────────────────
-    # If scene detection found too few frames (< 10 for a video > 30s),
-    # force-sample at regular intervals. This handles music videos,
-    # single-shot content, and very consistent visual styles.
+    # If zero scene boundaries were detected (e.g. single continuous camera shot
+    # with no cuts), force-sample uniform frames across the video duration.
     MIN_FRAMES = 10
-    duration_sec = frame_id / fps if fps > 0 else 0
+    duration_sec = total_frames / fps if (cv2 is not None and fps > 0) else (frame_id / fps if fps > 0 else 0)
 
-    if extracted_count < MIN_FRAMES and duration_sec > 30:
-        print(f"[Archivist] Only {extracted_count} scenes found — forcing uniform sampling for {duration_sec:.0f}s video")
-        # Force-sample every N seconds to get at least MIN_FRAMES
-        force_interval_sec = duration_sec / MIN_FRAMES
+    if extracted_count == 0:
+        target_count = min(MIN_FRAMES, max(2, int(duration_sec / 2.0))) if duration_sec > 0 else 3
+        print(f"[Archivist] Zero scenes found — forcing uniform sampling ({target_count} frames) for {duration_sec:.1f}s video")
+        force_interval_sec = (duration_sec / target_count) if (target_count > 0 and duration_sec > 0) else 1.0
         cap2 = cv2.VideoCapture(video_path) if cv2 is not None else None
         if cap2 and cap2.isOpened():
-            for i in range(MIN_FRAMES):
+            for i in range(target_count):
                 target_ms = i * force_interval_sec * 1000
                 cap2.set(cv2.CAP_PROP_POS_MSEC, target_ms)
                 ret, frame = cap2.read()

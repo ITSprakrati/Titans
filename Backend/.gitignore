@@ -1,11 +1,14 @@
 # Python
 .venv/
+venv/
 env/
 __pycache__/
 *.pyc
 
 # Environment variables (NEVER COMMIT)
 .env
+.env.*
+!.env.example
 
 # Downloaded videos and local stores
 assets/official/

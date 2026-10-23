@@ -68,7 +68,7 @@
   animation: gradientShift 3s ease infinite;
 }
 
-/* Ripple cell — VideoGuard Warm Gold / Amber */
+/* Ripple cell — SportGuard Warm Gold / Amber */
 @keyframes cellRipple {
   0%   { background-color: transparent; }
   28%  { background-color: rgba(232,127,36,0.22); box-shadow: inset 0 0 16px rgba(255,200,30,0.25); }
