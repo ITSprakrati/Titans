@@ -11,7 +11,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // Load .env from Backend/.env — works both locally and on Render
 config({ path: path.join(__dirname, "../.env") });
 
-import connectDB from "./config/db.js";
+import connectDB, { getMongoStatus } from "./config/db.js";
 import redis, { isRedisAvailable } from "./config/redis.js";
 import { initSocket } from "./config/socket.js";
 import huntRouter from "./routes/hunt.js";
@@ -64,13 +64,16 @@ app.get("/", (_req, res) => {
 });
 
 app.get("/api/health", async (_req, res) => {
-  const fastapiOk = await axios.get(`${process.env.FASTAPI_URL || "http://127.0.0.1:8001"}/`)
+  const fastapiBase = (process.env.FASTAPI_URL || "http://127.0.0.1:8001").replace(/\/+$/, "");
+  const fastapiOk = await axios.get(`${fastapiBase}/`, { timeout: 15000 })
     .then(() => true).catch(() => false);
+  const mongoInfo = getMongoStatus();
   res.json({
-    node:    "ok",
-    redis:   isRedisAvailable() ? "ok" : "unavailable",
-    fastapi: fastapiOk ? "ok" : "unavailable",
-    mongo:   mongoose.connection.readyState === 1 ? "ok" : "unavailable",
+    node:         "ok",
+    redis:        isRedisAvailable() ? "ok" : "unavailable",
+    fastapi:      fastapiOk ? "ok" : "unavailable",
+    mongo:        mongoInfo.status,
+    mongo_reason: mongoInfo.reason || undefined,
   });
 });
 
@@ -98,33 +101,33 @@ httpServer.listen(PORT, () => {
 
 // ── Render free tier keepalive ────────────────────────────────────────────────
 // Render spins down free services after 15 min of inactivity.
-// We ping both services every 14 min to keep them awake.
+// We ping ML service and self every 10 min to keep them awake.
 // Only runs in production (not locally).
 if (process.env.NODE_ENV !== "development") {
-  const SELF_URL    = process.env.RENDER_EXTERNAL_URL || `http://localhost:${PORT}`;
-  const FASTAPI_URL = process.env.FASTAPI_URL || "http://127.0.0.1:8001";
-  const PING_MS     = 14 * 60 * 1000; // 14 minutes
+  const SELF_URL    = (process.env.RENDER_EXTERNAL_URL || `http://localhost:${PORT}`).replace(/\/+$/, "");
+  const FASTAPI_URL = (process.env.FASTAPI_URL || "http://127.0.0.1:8001").replace(/\/+$/, "");
+  const PING_MS     = 10 * 60 * 1000; // 10 minutes (safely below 15 min idle timeout)
 
   const ping = async (url, name) => {
     try {
-      await axios.get(url, { timeout: 10000 });
+      await axios.get(url, { timeout: 60000 });
       console.log(`[Keepalive] ${name} ✓`);
-    } catch {
-      console.log(`[Keepalive] ${name} — no response (may be cold starting)`);
+    } catch (err) {
+      console.log(`[Keepalive] ${name} — no response (${err.message})`);
     }
   };
 
-  // Wait 2 min after startup before first ping
+  // Immediate keepalive check 5 seconds after startup, then repeating every 10 min
   setTimeout(() => {
-    ping(SELF_URL, "Node");
-    ping(FASTAPI_URL, "FastAPI");
+    ping(`${SELF_URL}/api/health`, "Node (Self)");
+    ping(`${FASTAPI_URL}/`, "FastAPI (ML)");
     setInterval(() => {
-      ping(SELF_URL, "Node");
-      ping(FASTAPI_URL, "FastAPI");
+      ping(`${SELF_URL}/api/health`, "Node (Self)");
+      ping(`${FASTAPI_URL}/`, "FastAPI (ML)");
     }, PING_MS);
-  }, 2 * 60 * 1000);
+  }, 5000);
 
-  console.log("[Keepalive] Self-ping enabled — pinging every 14 min");
+  console.log("[Keepalive] Self & ML keepalive active — pinging every 10 min with 60s timeout");
 }
 
 export default app;

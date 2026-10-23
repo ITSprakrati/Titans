@@ -821,9 +821,23 @@ def ingest_asset(payload: IngestRequest, background_tasks: BackgroundTasks):
                 title = provided_title or url.split("/")[-1].split("?")[0].rsplit(".", 1)[0] or "Official Video"
 
             else:
-                # ── Platform URL — use yt-dlp (with Cobalt fallback) ──────────
+                # ── Platform URL — use yt-dlp (with Cobalt/Apify fallback) ──────────
                 local_path = None
                 title = provided_title or "Unknown"
+
+                # Ensure cookies are parsed if env var is set
+                _setup_cookies()
+                is_youtube = any(h in url.lower() for h in ("youtube.com", "youtu.be"))
+                has_cookies = os.path.exists(COOKIES_PATH) and os.path.getsize(COOKIES_PATH) > 10
+                has_apify = bool(os.getenv("APIFY_API_TOKEN", "").strip())
+
+                # If on YouTube and neither cookies nor Apify token are present, fail early with friendly message
+                if is_youtube and not has_cookies and not has_apify:
+                    _write_job(job_id, {
+                        "status": "failed",
+                        "message": "YouTube blocked the server. Use a direct .mp4 link, or upload the file instead."
+                    })
+                    return
 
                 # --- Try Apify first for all platform URLs (bypasses IP blocks) ---
                 apify_success = False
@@ -919,15 +933,22 @@ def ingest_asset(payload: IngestRequest, background_tasks: BackgroundTasks):
                         if matches:
                             local_path = matches[0]
                         else:
-                            _write_job(job_id, {"status": "failed", "message": f"Failed to download video from {url}: {yt_err}"})
+                            err_str = str(yt_err).lower()
+                            if is_youtube or any(k in err_str for k in ("bot", "sign in", "429", "too many requests", "confirm", "blocked", "captcha")):
+                                friendly_msg = "YouTube blocked the server. Use a direct .mp4 link, or upload the file instead."
+                            else:
+                                friendly_msg = f"Failed to download video from {url}: {yt_err}"
+                            _write_job(job_id, {"status": "failed", "message": friendly_msg})
                             return
 
                 if not local_path or not os.path.exists(local_path):
-                    _write_job(job_id, {"status": "failed", "message": f"Video file could not be located after download from {url}"})
+                    msg = "YouTube blocked the server. Use a direct .mp4 link, or upload the file instead." if is_youtube else f"Video file could not be located after download from {url}"
+                    _write_job(job_id, {"status": "failed", "message": msg})
                     return
 
                 if os.path.getsize(local_path) < 10000:
-                    _write_job(job_id, {"status": "failed", "message": f"Downloaded media file too small ({os.path.getsize(local_path)} bytes) — download was incomplete or blocked."})
+                    msg = "YouTube blocked the server. Use a direct .mp4 link, or upload the file instead." if is_youtube else f"Downloaded media file too small ({os.path.getsize(local_path)} bytes) — download was incomplete or blocked."
+                    _write_job(job_id, {"status": "failed", "message": msg})
                     return
 
                 ext = os.path.splitext(local_path)[1].lower()

@@ -358,7 +358,11 @@ const AssetVault = () => {
       setProgress({ stage: 'complete', message: `"${latest.payload.title}" — ${latest.payload.frame_count} frames stored.` });
       setTimeout(() => { setProgress(null); setActiveJob(null); setActiveAssetId(null); setLoading(false); refresh(); }, 2000);
     } else if (latest.type === 'ingest:error') {
-      setError(latest.payload.message);
+      const rawMsg = latest.payload.message || 'Ingest failed.';
+      const friendly = (rawMsg.includes('bot') || rawMsg.includes('Sign in') || rawMsg.includes('YouTube blocked') || rawMsg.includes('429'))
+        ? 'YouTube blocked the server. Use a direct .mp4 link, or upload the file instead.'
+        : rawMsg;
+      setError(friendly);
       setProgress(null); setActiveJob(null); setActiveAssetId(null); setLoading(false);
     }
   }, [eventLog, activeJob, activeAssetId, refresh]);
@@ -426,7 +430,11 @@ const AssetVault = () => {
             setTimeout(() => { setProgress(null); setActiveJob(null); setActiveAssetId(null); setLoading(false); refresh(); }, 2000);
           } else if (asset?.status === 'failed') {
             clearInterval(pollInterval);
-            setError(asset.error_message || 'Ingest failed.');
+            const rawMsg = asset.error_message || 'Ingest failed.';
+            const friendly = (rawMsg.includes('bot') || rawMsg.includes('Sign in') || rawMsg.includes('YouTube blocked') || rawMsg.includes('429'))
+              ? 'YouTube blocked the server. Use a direct .mp4 link, or upload the file instead.'
+              : rawMsg;
+            setError(friendly);
             setProgress(null); setActiveJob(null); setActiveAssetId(null); setLoading(false);
           } else if (asset?.status === 'processing') {
             setProgress({ stage: 'processing', message: `Processing frames… (${asset.frame_count || 0} extracted so far)` });
@@ -439,7 +447,11 @@ const AssetVault = () => {
       // Clear poll after 35 minutes max
       setTimeout(() => clearInterval(pollInterval), 35 * 60 * 1000);
     } catch (err) {
-      setError(err?.response?.data?.message || 'Ingest failed. Is the backend running?');
+      const rawMsg = err?.response?.data?.message || err?.message || 'Ingest failed. Is the backend running?';
+      const friendly = (rawMsg.includes('bot') || rawMsg.includes('Sign in') || rawMsg.includes('YouTube blocked') || rawMsg.includes('429'))
+        ? 'YouTube blocked the server. Use a direct .mp4 link, or upload the file instead.'
+        : rawMsg;
+      setError(friendly);
       setProgress(null); setLoading(false);
     }
   };
@@ -476,7 +488,7 @@ const AssetVault = () => {
           <div>
             <h2 style={{ fontSize: 16, fontWeight: 800, color: G.text, margin: '0 0 4px' }}>Ingest Official Content</h2>
             <p style={{ fontSize: 12, color: G.sub, margin: 0, maxWidth: 520 }}>
-              The Archivist downloads via yt-dlp, extracts 1 frame per 30 seconds, embeds each through CLIP (512-dim), and stores vectors in the FAISS vault with a SHA-256 integrity hash.
+              The Archivist downloads the video, extracts 1 frame per second (INGEST_SAMPLE_SEC=1.0) with scene-aware change detection, embeds each frame through CLIP (512-dim), and stores vectors in the FAISS vault with a SHA-256 integrity hash.
             </p>
           </div>
           <button onClick={refresh} style={{
@@ -494,7 +506,7 @@ const AssetVault = () => {
               <LinkIcon size={14} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: G.muted }} />
               <input
                 type="url" value={url} onChange={e => setUrl(e.target.value)}
-                placeholder="YouTube URL, live stream, or direct .mp4 link (Dropbox, GDrive…)"
+                placeholder="Direct .mp4 link (Dropbox dl=1, GitHub raw, Google Drive, Box), or YouTube URL"
                 disabled={loading} required
                 style={{
                   width: '100%', paddingLeft: 36, paddingRight: 16, paddingTop: 10, paddingBottom: 10,
