@@ -1,174 +1,103 @@
-# MediaGuard Sports — Autonomous Media Rights Enforcement
+# VideoGuard AI — Autonomous Video IP Protection Platform
 
-MediaGuard Sports is a production-ready prototype that automates detection, classification, and response for suspected copyright infringement of live sports broadcasts. It combines a FastAPI machine-learning engine, a Node.js orchestrator, and a React dashboard to provide an end-to-end swarm pipeline: ingest → crawl → detect → adjudicate → remediate.
-
-This README documents architecture, capabilities, deployment notes, and the Evidence Vault & Chain-of-Custody feature.
+> **VideoGuard AI** is a production-ready, six-agent AI swarm that autonomously hunts pirated video content across the internet, classifies each incident under IP law, and either dispatches a DMCA takedown or deploys a revenue-sharing smart contract — with human approval required only at the final step.
 
 ---
 
-**Table of Contents**
+## Table of Contents
 
+- [Overview](#overview)
 - [Architecture](#architecture)
-- [Capabilities & Features](#capabilities--features)
+- [Agent Pipeline](#agent-pipeline)
+- [Tech Stack](#tech-stack)
 - [Core Components](#core-components)
+- [Database Models](#database-models)
+- [Real-Time Layer](#real-time-layer)
 - [Evidence Vault & Chain-of-Custody](#evidence-vault--chain-of-custody)
+- [API Reference](#api-reference)
+- [Environment Variables](#environment-variables)
+- [Local Development](#local-development)
+- [Deployment](#deployment)
 - [Security & Secrets](#security--secrets)
-- [Local Development & Quickstart](#local-development--quickstart)
-- [Testing & Smoke Checks](#testing--smoke-checks)
-- [Next Steps & Suggestions](#next-steps--suggestions)
+
+---
+
+## Overview
+
+VideoGuard AI automates the full lifecycle of video copyright enforcement:
+
+1. **Ingest** — Register official content into a FAISS fingerprint vault (1 frame extracted per 30 seconds, embedded via CLIP ViT-B/32)
+2. **Hunt** — Spider agent crawls YouTube and other platforms using AI-generated OSINT queries
+3. **Detect** — Sentinel agent performs dual-layer visual fingerprinting (CLIP cosine similarity + pHash cross-check)
+4. **Adjudicate** — LLM-powered legal classification (SEVERE PIRACY / FAIR USE / FAN CONTENT)
+5. **Enforce** — Enforcer drafts tiered DMCA takedown notices (human approval to send)
+6. **Monetize** — Broker mints revenue-sharing smart contracts for fair-use content
 
 ---
 
 ## Architecture
 
-High level:
-
-React Frontend (Vite)  ←→  Node.js Orchestrator (Express + Socket.IO)  ←→  FastAPI ML Engine
-
-- Frontend: interactive dashboard, human-in-the-loop approvals, real-time Socket.IO updates.
-- Node Orchestrator: API gateway, MongoDB persistence, Redis caching, swarm coordination.
-- FastAPI ML Engine: ingestion, CLIP/FAISS visual search, perceptual hashing (pHash), audio fingerprints, LLM-based adjudication and drafting.
-
-Data stores and state:
-
-- MongoDB: persistent models (HuntJob, Incident, DMCARecord, ContractRecord, IngestedAsset).
-- Redis (Upstash): caching (verdicts), velocity/repeat-offence counters.
-- FAISS: in-process vector index for image embeddings.
-- Filesystem `/tmp` and `vault/`: job persistence and Evidence Vault storage.
-
----
-
-## Capabilities & Features
-
-- Cross-platform leak detection across YouTube, TikTok, Telegram, Instagram, and direct CDN sources.
-- Automated OSINT crawling (yt-dlp) to discover suspect streams, re-streams, and video thumbnails.
-- Selective frame comparison using sampled keyframes, temporal frame overlap, and per-frame similarity scoring.
-- Dual-layer visual detection: CLIP embeddings (FAISS) + pHash cross-check for robust matches.
-- Audio fingerprint crawling and correlation to match suspect streams against official broadcast audio.
-- Embedding sync across ingest and scan agents to ensure consistent similarity scoring and reduce false positives.
-- Live stream optimization using thumbnail resolution fallback, adaptive thresholds, and real-time scoring.
-- LLM-powered adjudication with structured JSON output and a provider fallback chain (Groq → Gemini).
-- Automated DMCA drafting and tiered escalation (human approval required to send).
-- Broker flow to propose revenue-sharing contracts for fair-use/fan content.
-- Real-time dashboard with Socket.IO for live monitoring, manual overrides, and live incident maps.
-- Evidence Vault with Chain-of-Custody (SHA-256, timestamps, reviewer, entry hash) — records artifacts immutably.
-- Simple sync client to push evidence to an investigator workstation or mounted archive.
-
----
-
-## Core Components (where to look)
-
-- FastAPI ML Engine: `Backend/main.py`, `Backend/agents/*` (archivist.py, spider.py, sentinel.py, adjudicator.py, enforcer.py, broker.py)
-- Node Orchestrator: `Backend/server/app.js`, `Backend/server/controllers/*`, `Backend/server/routes/*`
-- Frontend: `Frontend/src/*` (React + Vite)
-- Evidence Vault: `Backend/evidence_vault/vault.py` and helper `evidence_sync_client.py`
-
----
-
-## Evidence Vault & Chain-of-Custody
-
-New feature: every detection, adjudication, enforcement draft, and broker proposal can be recorded in the Evidence Vault. Key behaviors:
-
-- Artifacts stored per-evidence under `Backend/vault/evidence/<evidence_id>/` (raw files, frames, embeddings, metadata).
-- Chain-of-custody appended to `Backend/vault/evidence_chain.jsonl` as newline-delimited JSON entries.
-- Each chain entry contains: `evidence_id`, `timestamp`, `reviewer`, `metadata`, `artifacts`, `prev_hash`, `entry_hash` (SHA-256 over canonical JSON).
-- Helper API: import `create_evidence` from `evidence_vault` and call with `artifacts` + `metadata`. A lightweight async worker is wired into FastAPI endpoints for `scan`, `adjudicate`, `enforce`, and `broker` to automatically record metadata.
-- Small sync client: `Backend/evidence_sync_client.py` watches the vault and copies evidence to a mounted investigator path. Replace with S3/Dropbox/SFTP uploader for production.
-
-Quick example (from Python):
-
-```py
-from evidence_vault import create_evidence
-
-eid, entry = create_evidence(
-    artifacts={"raw_video": "/tmp/video.mp4", "metadata": "/tmp/meta.json"},
-    metadata={"official_title": "Match X"},
-    reviewer="automated_agent",
-)
+```
+React Frontend (Vite + Socket.IO)
+        ↕
+Node.js Orchestrator (Express · Socket.IO · MongoDB · Redis)
+        ↕
+FastAPI ML Engine (CLIP · FAISS · yt-dlp · Groq · Gemini)
 ```
 
----
+**Data Stores:**
 
-## Security & Secrets (Important)
-
-Priority: remove any committed credentials immediately.
-
-- This repository contained `Backend/.env` with live API keys and a Redis URL. Revoke and rotate those keys now and remove the file from the git history if necessary.
-- Move secrets to a managed secret store (Render secrets, GitHub Actions secrets, AWS Secrets Manager, etc.) and use environment variables at runtime.
-- Add secret scanning to CI (git-secrets, truffleHog, etc.) and add `.env` to `.gitignore`.
-
----
-
-## Local Development & Quickstart
-
-Prereqs: Python 3.11+, Node 18+, npm, optionally Docker for reproducible environments.
-
-1. Backend (FastAPI ML Engine)
-
-```bash
-cd Backend
-python -m venv .venv
-# Windows:
-.venv\Scripts\activate
-# macOS / Linux:
-# source .venv/bin/activate
-pip install -r requirements.txt
-uvicorn main:app --host 127.0.0.1 --port 8001
-```
-
-2. Node Orchestrator
-
-```bash
-cd Backend/server
-npm install
-node app.js   # or `npm run dev` for watch mode
-```
-
-3. Frontend (dev)
-
-```bash
-cd Frontend
-npm install
-npm run dev
-```
-
-Notes: The ML engine requires significant CPU and RAM for `torch` and FAISS; for production use GPU-backed instances or a scaled inference service.
+| Store | Purpose |
+|---|---|
+| MongoDB Atlas | Persistent models — HuntJob, Incident, DMCARecord, ContractRecord, IngestedAsset |
+| Redis (Upstash) | Verdict caching, repeat-offender velocity counters (7-day window) |
+| FAISS (in-process) | 512-dim CLIP vector index for frame-level similarity search |
+| Filesystem `vault/` | FAISS index, vault metadata, evidence artifacts |
 
 ---
 
-## Testing & Smoke Checks
+## Agent Pipeline
 
-- There is a Node `test.js` for orchestrator sanity checks: `cd Backend/server && npm run test`.
-- A quick Python smoke snippet is included in the Evidence Vault tests; run a small script to exercise `create_evidence`, `list_evidence`, and `verify_chain` (see `Backend/EVIDENCE_README.md`).
+### Phase 1 — Archivist 🗄️
 
----
+**File:** `Backend/agents/archivist.py`
 
-## Next Steps & Suggestions
-
-- Immediately: rotate exposed API keys and remove `Backend/.env` from the repo.
-- Add: CI secret scanning and pre-commit hooks to prevent future leaks.
-- Improve: evidence sync to use an authenticated object store (S3/Backblaze) with signed URLs and server-side encryption.
-- Add: unit and integration tests for agent flows, and a lightweight acceptance test that runs the full swarm in a sandbox.
-- Consider legal review before enabling any automated takedown dispatch — keep the human-in-the-loop approval enforced for production.
-
----
+The Archivist is the ingestion agent. It fingerprints official video content and stores embeddings in the FAISS vault for downstream comparison.
 
 **How it works:**
-1. Accepts an official video URL and optional title
-2. If no title is provided, uses yt-dlp to extract metadata from the URL. On cloud IPs where YouTube blocks yt-dlp with bot detection, falls back to extracting the title from the URL path or video ID
-3. Calls a Groq/Gemini LLM to generate 4 targeted OSINT search queries (e.g. `"champions league final full"`, `"ucl final restream 2024"`) — much more effective than naive keyword search
-4. If LLM fails, falls back to rule-based query generation (`{title} full video`, `{title} highlights`, `{title} leaked stream`)
-5. Runs each query through `yt-dlp`'s `ytsearch5:` syntax to find up to 5 YouTube results per query
-6. Deduplicates results, maps each suspect to a geographic country centroid (30 countries supported)
-7. Returns a `map_payload` with threat nodes containing: title, uploader, URL, thumbnail, country, coordinates, view count, description
+1. Downloads the official video via `yt-dlp` (supports YouTube, Google Drive, direct `.mp4`/`.webm`, Dropbox, S3, CloudFront)
+2. Converts Google Drive share URLs to direct download URLs automatically
+3. **Extracts 1 frame every 30 seconds** (configurable via `SAMPLE_EVERY_N_SECS`)
+4. Resizes each frame to 224px before embedding (reduces memory footprint)
+5. Embeds frames in batches of 32 via **CLIP ViT-B/32** (512-dim, L2-normalised)
+6. Stores vectors in `IndexFlatIP(512)` FAISS vault with a SHA-256 integrity hash
+7. Writes job state atomically to disk (survives process restarts)
 
-**LLM model:** `llama-3.1-8b-instant` (Groq) or `gemini-2.0-flash-lite` (fallback)
+**Poll endpoint:** `GET /ingest/status/{job_id}` → `downloading` → `processing` → `complete` / `failed`
+
+---
+
+### Phase 2 — Spider 🕷️
+
+**File:** `Backend/agents/spider.py`
+
+The Spider is the OSINT crawling agent. It discovers suspect streams and re-uploads across platforms.
+
+**How it works:**
+1. Accepts the official video URL and optional title
+2. If no title provided, uses `yt-dlp` to extract metadata; falls back to URL path parsing on cloud IPs blocked by YouTube bot detection
+3. Calls a Groq/Gemini LLM to generate 4 targeted OSINT search queries (e.g. `"champions league final full"`, `"ucl final restream 2024"`)
+4. Falls back to rule-based query generation if LLM fails (`{title} full video`, `{title} highlights`, `{title} leaked stream`)
+5. Runs each query through `yt-dlp`'s `ytsearch5:` syntax to find up to 5 YouTube results per query
+6. Deduplicates results and maps each suspect to a geographic country centroid (30 countries supported)
+
+**LLM model:** `llama-3.1-8b-instant` (Groq) with `gemini-2.0-flash-lite` fallback
 
 **Output:** Up to 20 unique suspect URLs with metadata, saved to `assets/suspects/spider_payload.json`
 
 ---
 
-### Phase 2 — Sentinel 👁️
+### Phase 3 — Sentinel 👁️
 
 **File:** `Backend/agents/sentinel.py`
 
@@ -176,24 +105,23 @@ The Sentinel is the visual fingerprinting agent that determines whether a suspec
 
 **How it works:**
 1. Receives all suspect nodes from Spider
-2. For each YouTube thumbnail URL, tries 4 resolution variants: `maxresdefault` → `hqdefault` → `mqdefault` → original. Higher-res thumbnails contain actual footage frames rather than designed artwork, improving match accuracy
-3. Embeds each thumbnail via CLIP ViT-B/32 (512-dim, L2-normalised) — the same model used during ingest
-4. Searches the FAISS vault using inner product (= cosine similarity after L2 normalisation)
+2. For each YouTube thumbnail URL, tries 4 resolution variants: `maxresdefault` → `hqdefault` → `mqdefault` → original
+3. Embeds each thumbnail via **CLIP ViT-B/32** (512-dim, L2-normalised) — same model used during ingest
+4. Searches the FAISS vault using inner product (cosine similarity after L2 normalisation)
 5. Keeps the best similarity score across all resolution variants
 
-**Two-layer detection:**
+**Two-Layer Detection:**
 
-**Layer 1 — CLIP cosine similarity:**
-- `≥ 0.90` → `CRITICAL` — confirmed match, high visual overlap
-- `≥ 0.75` → `WARNING` — suspect, flagged for adjudication
-- `< 0.75` → `INFO` — no significant match
+| Layer | Method | Threshold | Result |
+|---|---|---|---|
+| Layer 1 | CLIP cosine similarity | ≥ 0.90 | `CRITICAL` — confirmed match |
+| Layer 1 | CLIP cosine similarity | ≥ 0.75 | `WARNING` — suspect, flagged |
+| Layer 1 | CLIP cosine similarity | < 0.75 | `INFO` — no match |
+| Layer 2 | pHash cross-check | distance < 15 | `phash_match: true` — pixel-level confirmed |
 
-**Layer 2 — pHash cross-check:**
-For any candidate above the suspect threshold, a perceptual hash (pHash) comparison is run against the matched vault frame. A hash distance < 15 confirms a pixel-level match (`phash_match = true`). This serves as a secondary verification layer and increases legal defensibility.
+**Batch processing:** `/scan/batch` processes all suspects in parallel using `ThreadPoolExecutor` (8 workers)
 
-**Batch processing:** The FastAPI `/scan/batch` endpoint processes all suspects in parallel using a `ThreadPoolExecutor` with up to 8 workers. The I/O-bound thumbnail fetching benefits significantly from parallelism even though the embedding is CPU-bound.
-
-**Velocity tracking:** Redis tracks how many times each account handle has been flagged within a 7-day window. Velocity ≥ 3 escalates any severity to `CRITICAL` regardless of confidence score, catching repeat offenders.
+**Velocity tracking:** Redis tracks flagged accounts over a 7-day window. Velocity ≥ 3 escalates any severity to `CRITICAL`, catching repeat offenders automatically.
 
 **Output per suspect:**
 ```json
@@ -210,24 +138,22 @@ For any candidate above the suspect threshold, a perceptual hash (pHash) compari
 
 ---
 
-### Phase 3 — Adjudicator ⚖️
+### Phase 4 — Adjudicator ⚖️
 
 **File:** `Backend/agents/adjudicator.py`
 
-The Adjudicator is a legal classification agent that determines whether a flagged video constitutes piracy or legitimate fair use, and routes the incident to the appropriate next agent.
+The Adjudicator is an LLM-powered legal classification agent that determines piracy vs. fair use and routes the incident to the appropriate next agent.
 
 **How it works:**
-1. Only processes incidents with confidence score ≥ 55 (configurable threshold). Lower-confidence suspects are auto-cleared without wasting LLM quota
-2. Checks Redis cache first — same account + platform + title = same ruling. Cache TTL is 24 hours
-3. Builds a structured prompt with all incident context: sentinel report, platform, account handle, video title, description (truncated to 400 chars), country, confidence score
+1. Only processes incidents with confidence score ≥ 55 (configurable). Lower-confidence suspects are auto-cleared
+2. Checks Redis cache first — same `(account, platform, title)` = same ruling. Cache TTL is 24 hours
+3. Builds a structured prompt with full incident context: sentinel report, platform, account handle, video title, description, country, confidence score
 4. Calls LLM with strict JSON output format
 
-**LLM fallback chain:**
-- Attempt 1: `llama-3.1-8b-instant` (Groq, 20k TPM — best for batch)
-- Attempt 2: `llama-3.3-70b-versatile` (Groq, higher quality, 6k TPM — wait 15s)
-- Attempt 3: `gemini-2.0-flash-lite` (Google — last resort)
-
-**Low-confidence leniency:** If sentinel confidence < 70%, and the LLM routes to Enforcer, the verdict is automatically downgraded to Broker with a recommendation for human review before issuing DMCA.
+**LLM Fallback Chain:**
+1. `llama-3.1-8b-instant` (Groq — 20k TPM, best for batch)
+2. `llama-3.3-70b-versatile` (Groq — higher quality, 6k TPM)
+3. `gemini-2.0-flash-lite` (Google — last resort)
 
 **Output verdict:**
 ```json
@@ -242,12 +168,12 @@ The Adjudicator is a legal classification agent that determines whether a flagge
 ```
 
 **Routing:**
-- `"Enforcer"` → incident goes to Phase 4 (DMCA)
-- `"Broker"` → incident goes to Phase 5 (rev-share contract)
+- `"Enforcer"` → Phase 5 (DMCA takedown)
+- `"Broker"` → Phase 6 (revenue-sharing contract)
 
 ---
 
-### Phase 4 — Enforcer 🔨
+### Phase 5 — Enforcer 🔨
 
 **File:** `Backend/agents/enforcer.py`
 
@@ -255,188 +181,124 @@ The Enforcer drafts legally compliant DMCA takedown notices for confirmed piracy
 
 **How it works:**
 1. Tracks repeat offences per `(account, platform)` pair in Redis with a 90-day TTL
-2. Builds a detailed prompt with all incident metadata and legal context
-3. Calls LLM to draft a full DMCA notice citing 17 U.S.C. § 512(c)
-4. The notice includes:
+2. Drafts a full DMCA notice citing **17 U.S.C. § 512(c)** including:
    - Formal header (To/From/Date/Re)
-   - Statement of authority
-   - Description of infringement with evidence
-   - Reference to FAISS vector proof (integrity hash)
-   - Action requested (removal + account strike)
-   - For offence ≥ 2: cites 17 U.S.C. § 512(i) repeat infringer policy
-   - For offence ≥ 3: adds referral to legal counsel
-   - Signature block
+   - Statement of authority and evidence description
+   - Reference to FAISS vector proof with integrity hash
+   - Tier escalation based on offence history
+3. **Human-in-the-loop:** Notices are drafted as `status: "drafted"`. A human must click **"Approve & Send"** in the dashboard before dispatch
 
-**Tier escalation based on repeat offences:**
-- Offence 1 → `standard`
-- Offence 2 → `expedited`
-- Offence 3+ → `legal_referral`
+**Tier Escalation:**
 
-**Platform legal contacts are hardcoded:**
-- YouTube: `copyright@youtube.com`
-- TikTok: `legal@tiktok.com`
-- Twitter: `copyright@twitter.com`
-- Instagram: `ip@instagram.com`
-- Telegram: `dmca@telegram.org`
-- Reddit: `copyright@reddit.com`
+| Offence | Tier | Action |
+|---|---|---|
+| 1st | `standard` | Standard DMCA notice |
+| 2nd | `expedited` | Cites 17 U.S.C. § 512(i) repeat infringer policy |
+| 3rd+ | `legal_referral` | Adds referral to legal counsel |
 
-**LLM model:** `llama-3.3-70b-versatile` (preferred for DMCA quality) with 8b fallback
-
-**Human-in-the-loop:** Notices are drafted and stored as `status: "drafted"`. A human must click "Approve & Send" in the dashboard before the status becomes `"sent"`. Rejecting a notice decrements the offence counter and clears the incident.
-
-**Integrity hash:** A SHA-256 hash of `{notice_text, target_account, platform}` is generated and stored for legal audit trail purposes.
+**Platform Legal Contacts:**
+`copyright@youtube.com` · `legal@tiktok.com` · `copyright@twitter.com` · `ip@instagram.com` · `dmca@telegram.org` · `copyright@reddit.com`
 
 ---
 
-### Phase 5 — Broker 💰
+### Phase 6 — Broker 💰
 
 **File:** `Backend/agents/broker.py`
 
-The Broker handles fair use / fan content cases by minting revenue-sharing smart contracts instead of issuing takedowns.
+The Broker handles fair-use and fan-content cases by minting revenue-sharing licensing contracts instead of issuing takedowns.
 
 **How it works:**
-1. Calculates content tier based on view count:
-   - `Bronze` < 10k views
-   - `Silver` 10k–100k
-   - `Gold` 100k–1M
-   - `Platinum` ≥ 1M views
-
-2. Recommends a revenue split based on tier and adjudicator risk score:
-   - Bronze: 35% holder / 65% creator (base)
-   - Risk score > 50 shifts the split toward the holder by 2% per 10 risk points (capped at 49%)
-
-3. Estimates monthly licensing revenue using platform CPM rates:
-   - YouTube: $0.60/1000 views (≈13% of YouTube's $4.50 CPM)
-   - TikTok: $0.004/1000 views
-   - Instagram: $0.20/1000 views
-   - Capped at $500/mo per deal
-
-4. Calls LLM to draft the full smart contract licensing agreement as structured JSON:
-   - Contract title, duration (6–24 months), payment schedule
-   - Terms, dispute resolution, special tier-specific clauses
-   - IP holder monthly cut estimate
-
-5. Generates a mock Polygon transaction hash (`0x` + 32 random bytes) and stores the contract
-
-**Human-in-the-loop:** Contracts are minted as `status: "minted"` and require human activation. A human must click "Activate Contract" to transition it to `"active"`. Contracts can also be disputed, which returns the incident to review status.
+1. Calculates content tier based on view count (`Bronze` < 10k · `Silver` 10k–100k · `Gold` 100k–1M · `Platinum` ≥ 1M)
+2. Recommends revenue split based on tier and adjudicator risk score
+3. Estimates monthly licensing revenue using platform CPM rates (YouTube: $0.60/1000 views · TikTok: $0.004/1000 · Instagram: $0.20/1000, capped at $500/mo)
+4. LLM drafts the full smart contract as structured JSON
+5. Generates a mock Polygon transaction hash and stores the contract as `status: "minted"`
+6. **Human-in-the-loop:** A human must click **"Activate Contract"** to transition to `"active"`
 
 ---
 
-## Backend — FastAPI (ML Engine)
+## Tech Stack
 
-**File:** `Backend/main.py`  
-**Port:** 8001  
-**Dockerfile:** `Backend/Dockerfile.fastapi`
+### ML Backend (FastAPI — Port 8001)
 
-The FastAPI service is the ML execution layer. It handles all computationally intensive operations: video downloading, frame embedding, vector search, and LLM calls for agents.
+| Component | Technology |
+|---|---|
+| Web framework | FastAPI + Uvicorn |
+| Video download | yt-dlp (with Node.js 20 for YouTube JS extraction) |
+| Frame extraction | OpenCV (`opencv-python-headless`) — **1 frame per 30 seconds** |
+| Image embedding | CLIP ViT-B/32 (transformers, PyTorch CPU) |
+| Vector search | FAISS (`IndexFlatIP` 512-dim, cosine similarity via L2 normalisation) |
+| Perceptual hashing | ImageHash (pHash, distance threshold < 15) |
+| LLM — primary | Groq (`llama-3.1-8b-instant`, `llama-3.3-70b-versatile`) |
+| LLM — fallback | Google Gemini (`gemini-2.0-flash-lite`) |
+| Containerisation | Docker (`python:3.11-slim` + Node.js 20) |
 
-### Video Ingest — `POST /ingest`
+### Orchestration Backend (Node.js — Port 8000)
 
-The ingest endpoint is fully asynchronous. It:
-1. Returns immediately with a `job_id`
-2. Spawns a daemon thread for the actual work
-3. Detects whether the URL is a direct file (`.mp4`, Google Drive, S3, CDN) or a platform URL (YouTube, etc.)
+| Component | Technology |
+|---|---|
+| Web framework | Express.js |
+| Real-time | Socket.IO |
+| Database | MongoDB (Mongoose ODM) |
+| Cache / counters | Redis (ioredis / Upstash) |
+| HTTP client | axios |
+| ID generation | uuid v4 |
 
-**For direct URLs / Google Drive:**
-- Converts Google Drive share URLs to direct download URLs automatically
-- Streams the download in 1MB chunks
-- Validates that the downloaded file is actually a video (rejects HTML responses)
+### Frontend (React — Port 5173)
 
-**For platform URLs (YouTube etc.):**
-- Uses `yt-dlp` with optional YouTube cookies (`YOUTUBE_COOKIES_B64` env var, base64-encoded Netscape cookie file)
-- Handles bot detection on cloud IPs by using cookies and falling back gracefully
-
-**Frame embedding:**
-- Extracts 1 frame every 30 seconds (configurable via `SAMPLE_EVERY_N_SECS`)
-- Resizes to 224px before embedding (reduces memory per frame)
-- Batches 32 frames per CLIP ViT-B/32 inference call (configurable via `BATCH_SIZE`)
-- Logs progress every 50 frames
-
-**Job persistence:**
-- Job state is written to `/tmp/mediaguard_jobs/{job_id}.json` using atomic writes (write to `.tmp` then `os.replace`)
-- Survives Render process restarts — the in-memory dict approach was replaced after it caused infinite polling loops on cold starts
-
-**Poll endpoint:** `GET /ingest/status/{job_id}` returns current status: `downloading` → `processing` → `complete` / `failed`
-
-### FAISS Vault
-
-- `IndexFlatIP(512)` — inner product index, 512 dimensions (CLIP ViT-B/32 output)
-- After L2 normalisation, inner product equals cosine similarity
-- Vault is persisted to `vault/faiss_vault.index` using atomic writes
-- Metadata (video path, timestamp) stored in `vault/vault_metadata.json`
-- On startup, loads existing vault if dimension matches (512), otherwise starts fresh
-
-### Archivist — `Backend/agents/archivist.py`
-
-The Archivist manages the FAISS vault and all embedding operations using CLIP ViT-B/32.
-
-**CLIP ViT-B/32 choice:**
-- CLIP ViT-B/32 produces superior semantic visual embeddings for piracy detection.
-- Raw 512-dim features (no projection) are L2-normalised and stored in FAISS.
-- Pre-downloaded at Docker build time to avoid runtime network calls.
-
-**Lazy loading:** The model loads on first ingest or scan call, not at import time. This prevents OOM during server startup health checks.
-
-### Debug Endpoints
-
-- `GET /debug/cookies` — verify YouTube cookie configuration
-- `GET /debug/sentinel?thumbnail_url=...` — raw similarity scan for threshold tuning
-- `GET /vault/status` — current vault size
+| Component | Technology |
+|---|---|
+| Framework | React 19 + Vite 8 |
+| Routing | React Router v7 |
+| Charts | Recharts + Apache ECharts |
+| Maps | React Leaflet |
+| Animations | Framer Motion |
+| Icons | Lucide React |
+| Real-time | socket.io-client |
+| Notifications | react-hot-toast |
+| 3D Globe | Three.js (colorful rotating Earth with Canvas 2D) |
+| Typography | Dancing Script (headings) + Inter (body) |
 
 ---
 
-## Backend — Node.js (Orchestration API)
+## Core Components
 
-**File:** `Backend/server/app.js`  
-**Port:** 8000  
-**Dockerfile:** `Backend/Dockerfile.node`
+```
+Backend/
+├── main.py                    # FastAPI ML Engine (port 8001)
+├── agents/
+│   ├── archivist.py           # Ingest & FAISS vault management
+│   ├── spider.py              # OSINT crawling & suspect discovery
+│   ├── sentinel.py            # Visual fingerprinting (CLIP + pHash)
+│   ├── adjudicator.py         # LLM legal classification
+│   ├── enforcer.py            # DMCA notice drafting
+│   └── broker.py              # Revenue-sharing contract minting
+├── server/
+│   ├── app.js                 # Node.js Orchestrator (port 8000)
+│   ├── controllers/           # Route controllers (swarm, agents, etc.)
+│   └── routes/                # Express API routes
+└── evidence_vault/
+    └── vault.py               # Evidence storage & chain-of-custody
 
-The Node.js service is the orchestration layer. It:
-- Serves as the API gateway for the React frontend
-- Orchestrates the five-agent swarm via `swarmController.js`
-- Manages all MongoDB persistence
-- Broadcasts real-time events via Socket.IO
-- Implements human-in-the-loop approval flows for DMCA notices and contracts
-- Keeps itself and FastAPI alive on Render free tier via a self-ping every 14 minutes
-
-### Routes
-
-| Route | Controller | Description |
-|---|---|---|
-| `POST /api/swarm/run` | swarmController | Launch autonomous 5-phase swarm |
-| `POST /api/ingest` | archivistController | Ingest official video |
-| `GET /api/ingest` | archivistController | List all ingested assets |
-| `GET /api/ingest/:id` | archivistController | Get asset by ID |
-| `DELETE /api/ingest/:id` | archivistController | Delete asset and video file |
-| `POST /api/scan` | sentinelController | Scan single thumbnail |
-| `POST /api/scan/batch` | sentinelController | Batch scan (used by swarm) |
-| `GET /api/incidents` | sentinelController | List incidents with filters |
-| `GET /api/incidents/:id` | sentinelController | Get incident with populated refs |
-| `POST /api/adjudicate` | adjudicatorController | Adjudicate single incident |
-| `POST /api/adjudicate/batch` | adjudicatorController | Batch adjudicate |
-| `GET /api/adjudicate/:id` | adjudicatorController | Get verdict for incident |
-| `POST /api/enforce` | enforcerController | Draft DMCA notice |
-| `PATCH /api/enforce/:id/approve` | enforcerController | Approve & send DMCA |
-| `PATCH /api/enforce/:id/reject` | enforcerController | Reject DMCA (clears incident) |
-| `GET /api/enforce` | enforcerController | List DMCA records |
-| `POST /api/broker` | brokerController | Mint rev-share contract |
-| `PATCH /api/broker/:id/activate` | brokerController | Activate contract |
-| `PATCH /api/broker/:id/dispute` | brokerController | Dispute contract |
-| `GET /api/broker` | brokerController | List contracts |
-| `GET /api/health` | app.js | Health check (node/redis/fastapi/mongo) |
-
-### Swarm Orchestrator — `swarmController.js`
-
-The swarm controller is the brain of the operation. It:
-
-1. Creates a `HuntJob` document immediately and responds with `jobId`
-2. Joins all clients to a Socket.IO room `hunt:{jobId}` for isolated event delivery
-3. Runs all 5 phases sequentially, emitting progress events after each step
-4. Implements Redis-backed verdict caching — same `(account, platform, title)` = reuse cached verdict
-5. Auto-clears low-confidence suspects (< 55%) without calling the Adjudicator
-6. Handles all failures gracefully — individual agent failures don't abort the whole swarm
-
-**Title resolution priority:** User-provided title → previously ingested asset title → Spider extracts from URL. This allows YouTube URLs to be used for swarm hunting without triggering bot detection on the metadata extraction step.
+Frontend/
+├── src/
+│   ├── pages/
+│   │   ├── Landing.jsx        # Marketing landing page
+│   │   ├── Dashboard.jsx      # Main dashboard
+│   │   └── Technology.jsx     # Architecture page
+│   └── components/
+│       ├── dashboard/
+│       │   ├── AssetVault.jsx      # Ingest interface
+│       │   ├── ThreatHunter.jsx    # Swarm launch & monitoring
+│       │   ├── IncidentTable.jsx   # Filtered incident list
+│       │   ├── Analytics.jsx       # Statistics & charts
+│       │   └── BrokerPanel.jsx     # Contract management
+│       └── landing/
+│           ├── HeroSection.jsx     # Hero with 3D globe
+│           ├── CobeGlobe.jsx       # Colorful rotating Earth globe
+│           ├── Navbar.jsx          # Landing navigation
+│           └── CTASection.jsx      # Call-to-action
+```
 
 ---
 
@@ -445,7 +307,6 @@ The swarm controller is the brain of the operation. It:
 All models use Mongoose with MongoDB Atlas.
 
 ### `IngestedAsset`
-Stores metadata for every official video that has been fingerprinted.
 ```
 official_video_url, title, local_path, frame_count, vault_size,
 tx_hash, integrity_hash, status (downloading/processing/complete/failed),
@@ -453,7 +314,6 @@ error_message, createdAt
 ```
 
 ### `HuntJob`
-Tracks each swarm execution.
 ```
 jobId, official_video_url, status (queued/processing/complete/failed),
 official_source {country, coordinates}, threat_count, piracy_count,
@@ -461,17 +321,15 @@ fair_use_count, error_message, completed_at, createdAt
 ```
 
 ### `Incident`
-Created for every suspect found by Sentinel. The central record linking all pipeline stages.
 ```
 jobId, title, platform, account_handle, url, thumbnail_url,
 country, coordinates {lat, lng}, confidence_score, severity (INFO/WARNING/CRITICAL),
-classification (UNREVIEWED/SEVERE PIRACY/FAIR USE / FAN CONTENT),
+classification (UNREVIEWED/SEVERE PIRACY/FAIR USE/FAN CONTENT),
 adjudicator_justification, status (detected/reviewing/takedown_pending/
 takedown_sent/monetized/cleared), dmca_record_id, contract_record_id, createdAt
 ```
 
 ### `DMCARecord`
-Stores drafted and sent DMCA notices.
 ```
 incident_id, target_account, platform, confidence_score, notice_text,
 integrity_hash, tier (standard/expedited/legal_referral), offence_number,
@@ -479,7 +337,6 @@ legal_contact, status (drafted/sent/rejected), sent_at, createdAt
 ```
 
 ### `ContractRecord`
-Stores rev-share licensing contracts.
 ```
 incident_id, target_account, platform, video_title,
 copyright_holder_share, creator_share, tx_hash, network,
@@ -489,176 +346,89 @@ estimated_monthly_revenue, status (minted/active/disputed), createdAt
 
 ---
 
-## Frontend — React Dashboard
+## Real-Time Layer
 
-**Framework:** React 19 + Vite  
-**Styling:** Inline styles (consistent design token system using a `G` object for colors)  
-**State:** React Context (DashboardContext + SocketContext)  
-**Routing:** React Router v7  
-**Charts:** Recharts  
-**Maps:** React Leaflet  
-**Animations:** Framer Motion  
-**Real-time:** Socket.IO client  
-
-### Pages
-
-**Dashboard (`/`)** — Main page containing all dashboard panels. Manages layout and renders all components.
-
-### Components
-
-#### Asset Vault (`AssetVault.jsx`)
-The ingestion interface. Allows rights holders to register official content into the FAISS fingerprint vault.
-
-- URL input accepts YouTube URLs, Google Drive share links, direct `.mp4`/`.webm` URLs, Dropbox, S3, CloudFront
-- For non-YouTube URLs, shows a title input field (required for Spider to generate search queries)
-- Shows a 4-stage progress timeline: `queued` → `downloading` → `processing` → `complete`
-- Socket.IO listener for `ingest:progress`, `ingest:complete`, `ingest:error` events
-- Polling fallback every 15s via `archivistService.getById()` in case socket events are missed
-- Asset cards show: thumbnail, status badge (PROTECTED/PROCESSING/FAILED), frame count, vault vectors, integrity hash, Polygon TX hash, ingest date
-- Delete confirmation dialog with warning about FAISS vector deletion
-
-#### Threat Hunter (`ThreatHunter.jsx`)
-The swarm launch interface and live monitoring panel.
-
-- URL input + optional title field (auto-fills from ingested assets when URL matches)
-- 5-phase progress bar with animated icons for each agent
-- Live agent feed terminal (dark theme) showing real-time Socket.IO events with timestamps
-- Summary grid showing: suspects found, piracy count, DMCA drafted, contracts minted
-- Integrated Leaflet map (`ThreatMap`) showing global threat node distribution
-- Confidence chart (Recharts AreaChart) showing confidence scores over time as incidents arrive
-
-#### Incident Table (`IncidentTable.jsx`)
-Filterable table of all detected incidents.
-
-- Filter by severity (CRITICAL/WARNING/INFO), status, and platform
-- Color-coded severity badges
-- Shows: title, platform, account handle, confidence score, status, coordinates
-- Links to individual incident actions (adjudicate, enforce, broker)
-
-#### Analytics (`Analytics.jsx`)
-Statistics dashboard with charts.
-
-- Total detections, critical threats, revenue protected, assets in vault
-- Platform breakdown charts
-- Severity distribution
-- Timeline of detections
-
-#### Broker Panel (`BrokerPanel.jsx`)
-Revenue-sharing contract management interface.
-
-- Lists all minted contracts with tier badges (Bronze/Silver/Gold/Platinum)
-- Shows copyright holder share vs creator share
-- Estimated monthly revenue per contract
-- "Activate Contract" and "Dispute" actions
-- Transaction hash display
-
-#### Sidebar (`Sidebar.jsx`)
-Navigation sidebar with links to all dashboard sections and notification badge.
-
-#### Header (`Header.jsx`)
-Top navigation bar with backend connection status indicator and notification bell with dropdown.
-
-### Context System
-
-#### `DashboardContext.jsx`
-The central application state. Provides:
-- **Data:** `incidents`, `assets`, `dmcas`, `contracts`, `stats`
-- **Swarm state:** `activeJobId`, `swarmPhase`, `swarmRunning`, `swarmComplete`
-- **Backend status:** `backendOnline`, `loading`
-- **Actions:** `refresh()`, `addNotification()`, `joinRoom()`, `joinIngest()`
-- **Mock fallback:** When backend is offline, displays 4 mock incidents so the UI is never empty
-- **Socket event handler:** Maps all 20+ Socket.IO event types to state mutations and toast notifications
-
-**Toast notification system:**
-- 🚨 Red — threat detected (CRITICAL severity)
-- 🤖 Blue — agent activity (phase transitions, verdicts)
-- ✅ Green — success (ingest complete, DMCA sent, contract activated)
-
-#### `SocketContext.jsx`
-Manages the Socket.IO connection lifecycle.
-- Connects to `VITE_API_URL` or `localhost:8000`
-- 10-second connection timeout, 10 reconnection attempts
-- Maintains an `eventLog` of up to 300 events (newest first)
-- `joinRoom(jobId)` — joins `hunt:{jobId}` room for isolated swarm events
-- `joinIngest(jobId)` — joins ingest room
-- Deferred join if socket isn't connected yet (queues on `connect` event)
-
----
-
-## Real-Time Layer — Socket.IO
-
-The Node.js server uses Socket.IO with named rooms for event isolation. Each swarm job gets its own room `hunt:{jobId}`, so multiple concurrent swarms don't cross-pollinate events.
+Node.js uses Socket.IO with named rooms (`hunt:{jobId}`) for isolated event delivery. Multiple concurrent swarms never cross-pollinate events.
 
 ### Event Reference
 
 | Event | Direction | Payload |
 |---|---|---|
 | `swarm:phase` | Server → Client | `{jobId, phase, agent, message}` |
-| `swarm:complete` | Server → Client | `{jobId, total_suspects, piracy_count, fair_use_count, dmca_drafted, contracts_minted}` |
+| `swarm:complete` | Server → Client | `{jobId, total_suspects, piracy_count, dmca_drafted, contracts_minted}` |
 | `swarm:error` | Server → Client | `{jobId, message}` |
-| `spider:complete` | Server → Client | `{jobId, official_source, threat_nodes, country_threat_counts, total}` |
-| `sentinel:threat_found` | Server → Client | `{incidentId, title, platform, account_handle, confidence_score, severity, match_confirmed, coordinates, velocity}` |
-| `sentinel:batch_complete` | Server → Client | `{jobId, total, piracy_count, fair_use_count}` |
-| `adjudicator:thinking` | Server → Client | `{incident_id, message}` |
+| `spider:complete` | Server → Client | `{jobId, threat_nodes, country_threat_counts, total}` |
+| `sentinel:threat_found` | Server → Client | `{incidentId, title, platform, confidence_score, severity, coordinates}` |
 | `adjudicator:verdict` | Server → Client | `{incident_id, verdict, next_agent}` |
-| `adjudicator:batch_complete` | Server → Client | `{jobId, total, enforcer_count, broker_count}` |
-| `enforcer:notice_ready` | Server → Client | `{incident_id, dmca_id, tier, offence_number, legal_contact, notice_preview}` |
-| `enforcer:dmca_sent` | Server → Client | `{dmca_id, incident_id, target_account, platform}` |
-| `broker:contract_ready` | Server → Client | `{incident_id, contract_id, tier, copyright_holder_share, creator_share, tx_hash, estimated_monthly_revenue}` |
-| `broker:contract_activated` | Server → Client | `{contract_id, incident_id, tx_hash}` |
+| `enforcer:notice_ready` | Server → Client | `{incident_id, dmca_id, tier, notice_preview}` |
+| `broker:contract_ready` | Server → Client | `{incident_id, contract_id, tier, tx_hash, estimated_monthly_revenue}` |
 | `ingest:progress` | Server → Client | `{jobId, assetId, stage, message}` |
-| `ingest:complete` | Server → Client | `{jobId, assetId, title, frame_count, vault_size, tx_hash, integrity_hash}` |
-| `ingest:error` | Server → Client | `{jobId, assetId, message}` |
-| `join:hunt` | Client → Server | `jobId` |
-| `join:ingest` | Client → Server | `jobId` |
+| `ingest:complete` | Server → Client | `{jobId, assetId, title, frame_count, vault_size, integrity_hash}` |
 
 ---
 
-## Tech Stack
+## Evidence Vault & Chain-of-Custody
 
-### ML Backend (FastAPI)
-| Component | Technology |
-|---|---|
-| Web framework | FastAPI + Uvicorn |
-| Video download | yt-dlp (with Node.js 20 for YouTube JS extraction) |
-| Frame extraction | OpenCV (opencv-python-headless) |
-| Image embedding | CLIP ViT-B/32 (transformers, PyTorch CPU) |
-| Vector search | FAISS (faiss-cpu, IndexFlatIP 512-dim) |
-| Perceptual hashing | ImageHash (pHash) |
-| LLM — primary | Groq (llama-3.1-8b-instant, llama-3.3-70b-versatile) |
-| LLM — fallback | Google Gemini (gemini-2.0-flash-lite) |
-| Containerisation | Docker (python:3.11-slim + Node.js 20) |
+Every detection, adjudication, enforcement draft, and broker proposal is recorded immutably in the Evidence Vault.
 
-### Orchestration Backend (Node.js)
-| Component | Technology |
-|---|---|
-| Web framework | Express.js |
-| Real-time | Socket.IO |
-| Database | MongoDB (Mongoose ODM) |
-| Cache / counters | Redis (ioredis) |
-| HTTP client | axios |
-| ID generation | uuid v4 |
-| Validation | Joi |
+- Artifacts stored per-evidence under `Backend/vault/evidence/<evidence_id>/`
+- Chain-of-custody appended to `Backend/vault/evidence_chain.jsonl`
+- Each entry contains: `evidence_id`, `timestamp`, `reviewer`, `metadata`, `artifacts`, `prev_hash`, `entry_hash` (SHA-256)
 
-### Frontend (React)
-| Component | Technology |
-|---|---|
-| Framework | React 19 + Vite 8 |
-| Routing | React Router v7 |
-| Charts | Recharts |
-| Maps | React Leaflet + Leaflet |
-| Animations | Framer Motion |
-| Icons | Lucide React |
-| HTTP | axios |
-| Real-time | socket.io-client |
-| Notifications | react-hot-toast |
-| Hosting | Firebase Hosting |
+```python
+from evidence_vault import create_evidence
+
+eid, entry = create_evidence(
+    artifacts={"raw_video": "/tmp/video.mp4", "metadata": "/tmp/meta.json"},
+    metadata={"official_title": "Match X"},
+    reviewer="automated_agent",
+)
+```
+
+---
+
+## API Reference
+
+### FastAPI Endpoints (Port 8001)
+
+| Method | Path | Description |
+|---|---|---|
+| GET | `/` | Health check + vault size |
+| GET | `/vault/status` | FAISS vault status |
+| POST | `/ingest` | Start async video ingest (1 frame/30 sec) |
+| GET | `/ingest/status/{job_id}` | Poll ingest job status |
+| POST | `/hunt` | Crawl for suspects (Spider) |
+| POST | `/scan` | Scan single thumbnail |
+| POST | `/scan/batch` | Batch scan (parallel, 8 workers) |
+| POST | `/adjudicate` | LLM classification |
+| POST | `/adjudicate/batch` | Batch LLM classification |
+| POST | `/enforce` | Draft DMCA notice |
+| POST | `/broker` | Mint rev-share contract |
+| GET | `/debug/cookies` | Cookie configuration check |
+| GET | `/debug/sentinel` | Raw similarity scan |
+
+### Node.js Routes (Port 8000)
+
+| Method | Path | Description |
+|---|---|---|
+| POST | `/api/swarm/run` | Launch full 6-phase autonomous swarm |
+| POST | `/api/ingest` | Ingest official video |
+| GET | `/api/ingest` | List ingested assets |
+| DELETE | `/api/ingest/:id` | Delete asset and vectors |
+| POST | `/api/scan/batch` | Batch scan |
+| GET | `/api/incidents` | List incidents with filters |
+| POST | `/api/adjudicate/batch` | Batch adjudicate |
+| PATCH | `/api/enforce/:id/approve` | Approve & send DMCA |
+| PATCH | `/api/enforce/:id/reject` | Reject DMCA |
+| POST | `/api/broker` | Mint contract |
+| PATCH | `/api/broker/:id/activate` | Activate contract |
+| GET | `/api/health` | Full system health check |
 
 ---
 
 ## Environment Variables
 
-### Backend `.env` (shared by Node.js and FastAPI)
+### `Backend/.env`
 
 ```env
 # Database
@@ -672,25 +442,20 @@ GROQ_API_KEY=gsk_...
 GEMINI_API_KEY=AIza...
 
 # Service URLs
-FASTAPI_URL=http://localhost:8001        # Node → FastAPI internal URL
-CLIENT_URL=https://your-frontend.web.app # CORS allowed origin
+FASTAPI_URL=http://localhost:8001
+CLIENT_URL=https://your-frontend.web.app
 
 # YouTube cookies (optional — helps bypass bot detection on cloud IPs)
 # Base64-encoded Netscape cookie file: base64 -w 0 cookies.txt
 YOUTUBE_COOKIES_B64=...
 
-# Render keepalive
-RENDER_EXTERNAL_URL=https://mediaguard-node.onrender.com
 NODE_ENV=production
-
-# Optional proxy for yt-dlp
-PROXY_URL=
 ```
 
-### Frontend `.env.production`
+### `Frontend/.env.production`
 
 ```env
-VITE_API_URL=https://mediaguard-node.onrender.com
+VITE_API_URL=https://your-node-backend.onrender.com
 ```
 
 ---
@@ -701,108 +466,94 @@ VITE_API_URL=https://mediaguard-node.onrender.com
 - Python 3.11+
 - Node.js 20+
 - MongoDB (local or Atlas)
-- Redis (local or cloud)
+- Redis (local or Upstash cloud)
 
 ### Setup
 
-**1. Clone and install**
+**1. Clone**
 ```bash
-git clone https://github.com/your-repo/MediaGuard-Sports.git
-cd MediaGuard-Sports
+git clone https://github.com/SANSKRITI01717/Titans.git
+cd Titans
 ```
 
-**2. FastAPI backend**
+**2. FastAPI ML Engine**
 ```bash
 cd Backend
+python -m venv .venv
+
+# Windows
+.venv\Scripts\activate
+# macOS / Linux
+# source .venv/bin/activate
+
 pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
 pip install -r requirements.txt
-uvicorn main:app --host 0.0.0.0 --port 8001 --reload
+uvicorn main:app --host 127.0.0.1 --port 8001 --reload
 ```
 
-**3. Node.js backend**
+**3. Node.js Orchestrator**
 ```bash
 cd Backend/server
 npm install
-node --watch app.js
+node app.js
+# or: node --watch app.js  (for auto-reload)
 ```
 
-**4. Frontend**
+**4. React Frontend**
 ```bash
 cd Frontend
 npm install
 npm run dev
 ```
 
-Services run on:
-- FastAPI: `http://localhost:8001`
-- Node.js: `http://localhost:8000`
-- Frontend: `http://localhost:5173`
+**Services:**
+| Service | URL |
+|---|---|
+| Frontend | http://localhost:5173 |
+| Node.js API | http://localhost:8000 |
+| FastAPI ML | http://localhost:8001 |
+
+> **Note:** The ML engine requires significant CPU/RAM for PyTorch and FAISS. For production use GPU-backed instances or a scaled inference service.
 
 ---
 
 ## Deployment
 
-### Current Production Setup
+### Current Setup
 
-| Service | Platform | URL |
-|---|---|---|
-| Frontend | Firebase Hosting | https://mediaguard-sports-bc615.web.app |
-| Node.js API | Render (free tier) | https://mediaguard-node.onrender.com |
-| FastAPI ML | Render (free tier) | https://mediaguard-fastapi.onrender.com |
-| Database | MongoDB Atlas | — |
-| Cache | Redis Cloud | — |
+| Service | Platform |
+|---|---|
+| Frontend | Firebase Hosting |
+| Node.js API | Render (or any Node.js host) |
+| FastAPI ML | Render (or any Python host) |
+| Database | MongoDB Atlas |
+| Cache | Redis Cloud (Upstash) |
 
-### Render Free Tier Notes
-
-Both backend services on Render's free tier sleep after 15 minutes of inactivity. The Node.js server includes a self-ping keepalive that pings both services every 14 minutes to prevent cold starts. Set `RENDER_EXTERNAL_URL` on Render to enable this.
-
-For consistent uptime, upgrade to Render's paid tier ($7/mo per service) or configure UptimeRobot to ping both health endpoints every 5 minutes:
-- `https://mediaguard-node.onrender.com/api/health`
-- `https://mediaguard-fastapi.onrender.com/`
-
-### Firebase Hosting Deploy
-
+### Firebase Hosting (Frontend)
 ```bash
 cd Frontend
 npm run build
 npx firebase-tools deploy --only hosting
 ```
 
-### Render Deploy
-Push to the `main` branch — Render auto-deploys from the configured Dockerfile path.
+### Render (Backend)
+Push to `main` branch — Render auto-deploys from the configured Dockerfile path.
+
+> **Free Tier Note:** Both backend services on Render's free tier sleep after 15 minutes of inactivity. The Node.js server includes a self-ping keepalive every 14 minutes. Set `RENDER_EXTERNAL_URL` to enable it.
 
 ---
 
-## API Reference
+## Security & Secrets
 
-### FastAPI Direct Endpoints
+> ⚠️ **Priority:** Rotate any exposed API keys immediately and remove secrets from git history.
 
-| Method | Path | Description |
-|---|---|---|
-| GET | `/` | Health check + vault size |
-| GET | `/vault/status` | FAISS vault status |
-| POST | `/ingest` | Start async video ingest |
-| GET | `/ingest/status/{job_id}` | Poll ingest job status |
-| POST | `/hunt` | Crawl YouTube for suspects |
-| POST | `/scan` | Scan single thumbnail |
-| POST | `/scan/batch` | Batch scan thumbnails |
-| POST | `/adjudicate` | LLM classification |
-| POST | `/adjudicate/batch` | Batch LLM classification |
-| POST | `/enforce` | Draft DMCA notice |
-| POST | `/broker` | Mint rev-share contract |
-| GET | `/debug/cookies` | Cookie configuration check |
-| GET | `/debug/sentinel` | Raw similarity scan |
+- Move all secrets to a managed secret store (Render Secrets, GitHub Actions Secrets, AWS Secrets Manager)
+- Add `.env` to `.gitignore` and verify it is not committed
+- Add secret scanning to CI (git-secrets, truffleHog, or GitHub's native secret scanning)
+- Keep **human-in-the-loop approval enforced** for all DMCA dispatches and contract activations in production
 
 ---
 
-## Design Decisions & Trade-offs
+## License
 
-**CLIP ViT-B/32 Alignment:** CLIP ViT-B/32 produces superior semantic embeddings for piracy detection and has been adopted as the standard embedding model across the ingestion and scanning pipelines. To prevent OOM errors or startup timeouts on constrained cloud platforms like Render's free tier, the model weights are pre-cached during the Docker build stage and lazy-loaded on the first API request.
-
-**File-backed job store vs in-memory:** The original in-memory `_ingest_jobs` dict was wiped on every Render restart, causing the Node poller to loop forever on 404s. File persistence in `/tmp` survives within a deployment lifecycle (hours) — long enough for any ingest job to complete.
-
-**Direct LLM calls vs CrewAI:** CrewAI's agent loop was replaced with direct API calls after consistently hitting "Maximum iterations reached" errors on structured JSON tasks. Direct calls are faster, more reliable, and the retry logic (with model fallback chain) provides the same resilience without the overhead.
-
-**Adjudicator caching:** The same video title + account + platform will always get the same ruling. Redis caching prevents redundant LLM calls when the same infringing account uploads multiple copies of the same content.
-
-**Human-in-the-loop:** DMCA notices and contracts are never automatically sent/activated. They require explicit human approval in the dashboard. This prevents false positives from having legal consequences and satisfies DMCA good-faith requirements.
+This project is open source. All automated enforcement actions require explicit human approval before execution.
