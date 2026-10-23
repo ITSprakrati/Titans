@@ -50,7 +50,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-@app.get("/")
+@app.api_route("/", methods=["GET", "HEAD"])
 def root_health():
     return {"status": "ok", "service": "SportGuard AI ML Engine", "version": "1.0.0"}
 
