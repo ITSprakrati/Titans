@@ -243,7 +243,7 @@ const Hero = ({ onLaunch }) => (
           className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-teal-500/10 border border-teal-500/25 mb-7">
           <Zap className="w-3 h-3 text-teal-600 fill-teal-600" />
           <span className="text-[10px] font-bold text-teal-700 uppercase tracking-[0.22em]">
-            Autonomous IP Protection · Google Solution Challenge 2026
+            Autonomous IP Protection
           </span>
         </motion.div>
 
@@ -900,7 +900,7 @@ const CTA = ({ onLaunch }) => (
             <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
           </motion.button>
           <p className="mt-7 text-[10px] text-slate-400 font-bold uppercase tracking-[0.28em]">
-            Google Solution Challenge 2026 · SDG 8 &amp; 9 · Open Source
+            Autonomous IP Intelligence · Global Protection Protocol
           </p>
         </div>
       </motion.div>

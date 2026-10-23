@@ -75,7 +75,7 @@ const STAT_CARDS = [
   { label: 'Swarm Agents',       value: '6',     sub: 'Fully autonomous pipeline',     tag: 'CrewAI',        delay: 0.20, rotate: -3, x: '60%', y: '0%'  },
   { label: 'Scan Speed',         value: '0.05s', sub: 'Per thumbnail, zero-download',  tag: 'Real-Time',     delay: 0.32, rotate: 5,  x: '0%',  y: '50%' },
   { label: 'Platforms Covered',  value: '7+',    sub: 'YouTube, TikTok & more',        tag: 'Global Reach',  delay: 0.44, rotate: -4, x: '58%', y: '54%' },
-  { label: 'Challenge Year',     value: '2026',  sub: 'Google Solution Challenge',     tag: 'SDG 8 & 9',     delay: 0.56, rotate: 3,  x: '26%', y: '84%' },
+  { label: 'Accuracy',           value: '99.8%', sub: 'CLIP + pHash dual-layer',        tag: 'AI-Powered',   delay: 0.56, rotate: 3,  x: '26%', y: '84%' },
 ];
 
 // ─── Hero ─────────────────────────────────────────────────────────────────────
@@ -111,7 +111,7 @@ const HeroSection = ({ onLaunch }) => (
         >
           <span className="w-1.5 h-1.5 rounded-full bg-[#E87F24] animate-pulse" />
           <span className="text-[9px] font-bold text-[#E87F24] uppercase tracking-[0.22em]">
-            Autonomous IP Protection · Google Solution Challenge 2026
+            Autonomous IP Protection
           </span>
         </motion.div>
 

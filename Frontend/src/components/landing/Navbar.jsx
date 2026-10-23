@@ -24,7 +24,7 @@ const FEATURES = [
   {
     icon: Users,
     title: 'About Us',
-    desc: 'Built for Google Solution Challenge 2026. SDG 8 & 9 — open source, non-profit.',
+    desc: 'Autonomous IP protection platform — detecting and enforcing copyright at scale.',
     img: 'https://images.unsplash.com/photo-1522071820081-009f0129c71c?w=320&h=180&fit=crop&auto=format&q=80',
     action: 'scroll',
     section: 'stack',
@@ -135,7 +135,7 @@ const FeaturesDropdown = ({ onNavigate, onLaunch }) => {
 
         {/* Footer CTA */}
         <div className="px-5 py-3 border-t border-white/5 flex items-center justify-between">
-          <p className="text-[11px] text-slate-500">Google Solution Challenge 2026 · SDG 8 &amp; 9</p>
+          <p className="text-[11px] text-slate-500">Autonomous IP Intelligence · Global Scale</p>
           <motion.button
             whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }}
             onClick={onLaunch}
