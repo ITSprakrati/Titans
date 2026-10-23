@@ -15,6 +15,7 @@ evidence_vault/
 *.pth
 *.onnx
 *.onnx.data
+!clip_vision_int8.onnx
 *.mp4
 *.webm
 .venv
