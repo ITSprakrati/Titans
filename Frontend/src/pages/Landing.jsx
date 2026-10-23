@@ -110,8 +110,8 @@ const CometCard = ({ children, className = '' }) => {
         style={{
           width: 6, height: 6,
           borderRadius: '50%',
-          background: 'radial-gradient(circle, #2dd4bf 0%, transparent 70%)',
-          boxShadow: '0 0 12px 6px rgba(45,212,191,0.5), 0 0 40px 16px rgba(45,212,191,0.15)',
+          background: 'radial-gradient(circle, #FFC81E 0%, transparent 70%)',
+          boxShadow: '0 0 12px 6px rgba(255,200,30,0.5), 0 0 40px 16px rgba(232,127,36,0.18)',
           transform: 'translate(-50%, -50%)',
           opacity: 0,
         }}
@@ -120,7 +120,7 @@ const CometCard = ({ children, className = '' }) => {
       <div
         className="pointer-events-none absolute inset-0 z-10"
         style={{
-          background: 'radial-gradient(600px circle at var(--mx,50%) var(--my,50%), rgba(45,212,191,0.04) 0%, transparent 60%)',
+          background: 'radial-gradient(600px circle at var(--mx,50%) var(--my,50%), rgba(255,200,30,0.06) 0%, transparent 60%)',
         }}
         ref={(el) => {
           if (!el) return;
@@ -203,7 +203,7 @@ const StatCard = ({ label, value, sub, tag, delay = 0, rotate = 0 }) => (
     <motion.div
       animate={{ y: [0, -9, 0], rotate: [rotate, rotate + 1.5, rotate] }}
       transition={{ duration: 5 + delay * 1.5, repeat: Infinity, ease: 'easeInOut', delay: delay * 0.3 }}
-      whileHover={{ scale: 1.06, boxShadow: '0 12px 40px rgba(20,184,166,0.18), 0 2px 8px rgba(0,0,0,0.06)' }}
+      whileHover={{ scale: 1.06, boxShadow: '0 12px 40px rgba(232,127,36,0.20), 0 2px 8px rgba(0,0,0,0.06)' }}
       className="bg-white/95 backdrop-blur-sm rounded-2xl p-4 border border-slate-100 w-[164px] cursor-default"
       style={{
         boxShadow: '0 8px 32px rgba(0,0,0,0.08), 0 2px 8px rgba(0,0,0,0.04)',
@@ -405,7 +405,7 @@ const TiltCard = ({ children, className = '' }) => {
         className="pointer-events-none absolute inset-0 rounded-3xl z-10 transition-opacity duration-300"
         style={{
           opacity: hovered ? 1 : 0,
-          background: `radial-gradient(280px circle at ${glowPos.x}% ${glowPos.y}%, rgba(20,184,166,0.10) 0%, transparent 70%)`,
+          background: `radial-gradient(280px circle at ${glowPos.x}% ${glowPos.y}%, rgba(232,127,36,0.14) 0%, transparent 70%)`,
         }}
       />
       {children}

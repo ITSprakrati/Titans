@@ -22,12 +22,12 @@ const StatCard = ({ label, value, sub, tag, delay = 0, rotate = 0, x = 0, y = 0 
         transform: `rotate(${rotate}deg)`,
       }}
     >
-      <div className="w-7 h-[3px] bg-teal-500 rounded-full mb-3" />
+      <div className="w-7 h-[3px] bg-[#E87F24] rounded-full mb-3" />
       <p className="text-[8px] font-black text-slate-400 uppercase tracking-[0.24em] mb-1">{label}</p>
       <p className="text-[2rem] font-black text-slate-900 leading-none mb-1.5">{value}</p>
       <p className="text-[11px] text-slate-400 font-medium mb-3 leading-snug">{sub}</p>
-      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-teal-50 border border-teal-200/60 rounded-full text-[8px] font-bold text-teal-700 uppercase tracking-wider">
-        <span className="w-1.5 h-1.5 rounded-full bg-teal-500 shrink-0" />
+      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-[#FEFDDF] border border-[#FFC81E]/40 rounded-full text-[8px] font-bold text-[#E87F24] uppercase tracking-wider">
+        <span className="w-1.5 h-1.5 rounded-full bg-[#E87F24] shrink-0" />
         {tag}
       </span>
     </motion.div>
@@ -36,23 +36,23 @@ const StatCard = ({ label, value, sub, tag, delay = 0, rotate = 0, x = 0, y = 0 
 
 // ─── Live ticker ──────────────────────────────────────────────────────────────
 const TICKER_EVENTS = [
-  { icon: '🕷️', text: 'Spider identified 18 suspects across YouTube',         color: '#2dd4bf' },
-  { icon: '👁️', text: 'Sentinel: CRITICAL match — L2 distance 0.09',          color: '#fbbf24' },
-  { icon: '⚖️', text: 'Adjudicator: SEVERE PIRACY → routed to Enforcer',      color: '#a78bfa' },
+  { icon: '🕷️', text: 'Spider identified 18 suspects across YouTube',         color: '#FFC81E' },
+  { icon: '👁️', text: 'Sentinel: CRITICAL match — L2 distance 0.09',          color: '#E87F24' },
+  { icon: '⚖️', text: 'Adjudicator: SEVERE PIRACY → routed to Enforcer',      color: '#73A5CA' },
   { icon: '🔨', text: 'Enforcer: DMCA notice drafted for @PirateHD',           color: '#f87171' },
-  { icon: '💰', text: 'Broker: Revenue-share contract minted on Polygon',      color: '#34d399' },
-  { icon: '✅', text: 'Swarm complete — 8 incidents resolved autonomously',    color: '#818cf8' },
+  { icon: '💰', text: 'Broker: Revenue-share contract minted on Polygon',      color: '#FFC81E' },
+  { icon: '✅', text: 'Swarm complete — 8 incidents resolved autonomously',    color: '#73A5CA' },
 ];
 
 const LiveTicker = () => (
   <div
-    className="relative overflow-hidden rounded-xl bg-[#020c0b]/80 border border-teal-500/15 py-2.5"
-    style={{ boxShadow: '0 4px 20px rgba(20,184,166,0.08)' }}
+    className="relative overflow-hidden rounded-xl bg-[#0d1b2a]/90 border border-[#E87F24]/20 py-2.5"
+    style={{ boxShadow: '0 4px 20px rgba(232,127,36,0.12)' }}
   >
     <div className="absolute left-0 top-0 bottom-0 w-10 z-10 pointer-events-none"
-      style={{ background: 'linear-gradient(to right, #020c0b, transparent)' }} />
+      style={{ background: 'linear-gradient(to right, #0d1b2a, transparent)' }} />
     <div className="absolute right-0 top-0 bottom-0 w-10 z-10 pointer-events-none"
-      style={{ background: 'linear-gradient(to left, #020c0b, transparent)' }} />
+      style={{ background: 'linear-gradient(to left, #0d1b2a, transparent)' }} />
     <motion.div
       animate={{ x: ['0%', '-50%'] }}
       transition={{ duration: 26, repeat: Infinity, ease: 'linear' }}
@@ -107,10 +107,10 @@ const HeroSection = ({ onLaunch }) => (
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
-          className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-teal-500/10 border border-teal-500/25 mb-7"
+          className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#E87F24]/10 border border-[#E87F24]/25 mb-7"
         >
-          <span className="w-1.5 h-1.5 rounded-full bg-teal-500 animate-pulse" />
-          <span className="text-[9px] font-bold text-teal-700 uppercase tracking-[0.22em]">
+          <span className="w-1.5 h-1.5 rounded-full bg-[#E87F24] animate-pulse" />
+          <span className="text-[9px] font-bold text-[#E87F24] uppercase tracking-[0.22em]">
             Autonomous IP Protection · Google Solution Challenge 2026
           </span>
         </motion.div>
@@ -131,7 +131,7 @@ const HeroSection = ({ onLaunch }) => (
           initial={{ opacity: 0, y: 14 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.22, duration: 0.6 }}
-          className="text-[14px] font-bold text-teal-600 mb-4 tracking-wide uppercase"
+          className="text-[14px] font-bold text-[#E87F24] mb-4 tracking-wide uppercase"
         >
           Detect · Adjudicate · Monetize
         </motion.p>
