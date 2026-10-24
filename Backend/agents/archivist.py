@@ -1091,7 +1091,7 @@ def tool_ingest_thumbnails(images: list, video_id: str, source_url: str = "", ti
     if not pil_images:
         return {"success": False, "error": "Could not decode any valid thumbnail images"}
 
-    embeddings = _extract_clip_batch(pil_images)
+    embeddings = _embed_batch(pil_images)
     if embeddings is None or len(embeddings) == 0:
         return {"success": False, "error": "Failed to compute CLIP embeddings for thumbnails"}
 
