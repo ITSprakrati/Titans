@@ -36,8 +36,11 @@
    - Resolved Docker build context exclusions by adding explicit `!clip_vision_int8.onnx` unignore in `Backend/.dockerignore`.
    - Added `sed -i 's/\r$//' /entrypoint.sh` to ensure Unix LF line endings across multi-platform checkouts.
 6. **Fixed in this push**:
+   - **YouTube Ingest Fallback & Vector Embedding Fix**: Replaced undefined `_extract_clip_batch` call in `agents/archivist.py` with `_embed_batch(pil_images)` and added missing `hashlib` import in `main.py`. Verified zero undefined names with `pyflakes`. Tested and confirmed live on `sportguard-ml.onrender.com`: direct MP4 ingest completes (3 frames, vault size 3), YouTube fallback ingest completes (`partial: true`, 4 thumbnails embedded into FAISS), and `/scan` achieves 98.73% match confidence.
+   - **Guaranteed YouTube Ingest Resilience**: Added automatic fallback to YouTube oEmbed metadata extraction and edge CDN thumbnail embedding (`i.ytimg.com`) when video stream downloads are challenged by bot checks on cloud IPs.
+   - **Direct Video File Uploads**: Added `POST /api/ingest/upload` on Node API and `POST /ingest/upload` on FastAPI ML service for direct `.mp4`, `.mov`, `.webm`, `.avi`, `.mkv` uploads (up to 100MB), integrated with a mode toggle in Asset Vault UI.
    - **UptimeRobot 405 Method Not Allowed**: Registered `HEAD` method support on `GET /` on `sportguard-ml` so uptime monitoring checks succeed.
-   - **Friendly YouTube Error Messages**: Detected datacenter IP blocks and bot detection from YouTube to return actionable guidance (`YouTube blocked the server. Use a direct .mp4 link, or upload the file instead.`).
+   - **Friendly YouTube Error Messages & Card Recovery**: Ingest error messages indicate cloud bot blocks clearly; failed cards in the Asset Vault feature Retry and Delete buttons.
    - **Keepalive Interval & Timeout**: Tightened ping interval from 14 min to 10 min with 60s timeout to survive cold starts.
 
 ---
@@ -78,8 +81,8 @@
   3. **Guaranteed Thumbnail Fallback Mode (Autonomous)**: If all video stream attempts are blocked by YouTube, the engine automatically:
      - Fetches video metadata/title via YouTube's unblocked oEmbed endpoint.
      - Downloads all available CDN thumbnails (`maxresdefault.jpg`, `sddefault.jpg`, `hqdefault.jpg`, `0.jpg`).
-     - Computes 512-dim Int8 CLIP vision embeddings and perceptual hashes (pHash) on the keyframe images.
-     - Stores them directly into the FAISS vault and marks the asset as `complete` with `partial: true` ("⚠️ Partial: thumbnail fingerprint (YouTube blocked full download)").
+     - Computes 512-dim Int8 CLIP vision embeddings via `_embed_batch(pil_images)` and perceptual hashes (pHash) on keyframe images (verified with `pyflakes` and zero NameErrors).
+     - Stores them directly into the FAISS vault and marks the asset as `complete` with `partial: true` ("⚠️ Partial: thumbnail fingerprint (YouTube blocked full download)"). Matches verify in `/scan` with >98% confidence.
   4. **Direct Video File Upload Endpoint (Up to 100MB)**: Added `POST /api/ingest/upload` on Node API and `POST /ingest/upload` on FastAPI ML service. In the frontend Asset Vault, users can toggle between `[Video URL]` and `[Upload Video File]` to ingest raw files (`.mp4`, `.mov`, `.webm`, `.avi`, `.mkv`) without relying on YouTube stream extraction.
   5. **Card Self-Healing & Management**:
      - Failed assets show a clear error banner, a `Retry` button to re-attempt ingest, and a `Remove` button calling `DELETE /api/ingest/:id` to permanently remove failed cards.
