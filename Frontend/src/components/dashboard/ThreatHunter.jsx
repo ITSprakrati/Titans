@@ -41,6 +41,8 @@ const PHASES = [
 
 // ─── Agent colors for log ─────────────────────────────────────────────────────
 const LOG_CFG = {
+  'spider:platform_result':   { icon: '📡', color: '#6366f1' },
+  'spider:platform_error':    { icon: '⚠️', color: '#f59e0b' },
   'swarm:phase':              { icon: '⚡', color: '#6366f1' },
   'spider:complete':          { icon: '🕷️', color: '#6366f1' },
   'sentinel:threat_found':    { icon: '👁️', color: '#f59e0b' },
@@ -65,6 +67,8 @@ const LOG_CFG = {
 };
 
 const logText = (type, payload) => ({
+  'spider:platform_result':   `[${payload?.platform}] ${payload?.message || `Found ${payload?.count} suspects`}`,
+  'spider:platform_error':    `[${payload?.platform}] ${payload?.message || 'Platform search blocked/failed'}`,
   'swarm:phase':              `Phase ${payload?.phase}: ${payload?.agent} — ${payload?.message}`,
   'spider:complete':          `Spider found ${payload?.total || 0} suspects`,
   'sentinel:threat_found':    `${payload?.severity}: ${payload?.title} on ${payload?.platform} (${payload?.confidence_score}%)`,

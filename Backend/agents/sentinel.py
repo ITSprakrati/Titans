@@ -309,11 +309,13 @@ def _thumbnail_variants(thumbnail_url: str) -> list[str]:
         return []
 
     # YouTube thumbnail variants (much higher quality than default)
-    yt_match = re.search(r'/vi/([a-zA-Z0-9_-]+)/', thumbnail_url)
+    yt_match = re.search(r'(?:/vi/|v=|\/)([a-zA-Z0-9_-]{11})', thumbnail_url)
     if yt_match:
         vid_id = yt_match.group(1)
         return [
             f"https://i.ytimg.com/vi/{vid_id}/hqdefault.jpg",
+            f"https://i.ytimg.com/vi/{vid_id}/mqdefault.jpg",
+            f"https://i.ytimg.com/vi/{vid_id}/maxresdefault.jpg",
             thumbnail_url,
         ]
 
@@ -323,7 +325,7 @@ def _thumbnail_variants(thumbnail_url: str) -> list[str]:
 
 def _fetch_image(url: str) -> Image.Image:
     try:
-        resp = requests.get(url, timeout=3.5, headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"})
+        resp = requests.get(url, timeout=4.0, headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"})
         resp.raise_for_status()
         return Image.open(BytesIO(resp.content)).convert("RGB")
     except Exception as e:

@@ -670,14 +670,15 @@ def batch_scan(payload: BatchScanRequest):
         return {"node": node, "scan": result}
 
     results = []
-    with ThreadPoolExecutor(max_workers=8) as pool:
+    # Use max_workers=2 and batch=2 to keep RAM strictly under 450MB on Render 512MB tier
+    with ThreadPoolExecutor(max_workers=2) as pool:
         futures = {pool.submit(_scan_one, node): node for node in nodes}
         for future in as_completed(futures):
             try:
                 results.append(future.result())
             except Exception as e:
                 node = futures[future]
-                results.append({"node": node, "scan": {"error": str(e)}})
+                results.append({"node": node, "scan": {"error": str(e), "confidence_score": 0.0, "match_confirmed": False}})
 
     return {"success": True, "results": results, "total": len(results)}
 

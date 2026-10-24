@@ -278,11 +278,87 @@ if os.path.exists(VAULT_TEMPORAL_PATH):
         temporal_store = {}
 
 # M1 FIX: Max temporal signatures stored per video.
-# Each signature = TEMPORAL_WINDOW × 512 floats = 5 × 512 × 4 bytes = 10KB
-# 200 signatures × 10KB = 2MB per video — acceptable.
-# Without cap: 90min video with 1 scene/10s = 540 scenes → 536 signatures = 5.4MB per video.
-# With 10 ingested videos: 54MB JSON written on every vault flush.
 MAX_TEMPORAL_SIGS_PER_VIDEO = int(os.environ.get("MAX_TEMPORAL_SIGS", "200"))
+
+# ── MongoDB Vault Persistence & Restore ───────────────────────────────────────
+def _get_mongo_client():
+    uri = os.environ.get("MONGO_URI", "").strip()
+    if not uri:
+        return None
+    try:
+        from pymongo import MongoClient
+        client = MongoClient(uri, serverSelectionTimeoutMS=5000, connectTimeoutMS=5000)
+        # Test connection non-blocking
+        return client
+    except Exception as e:
+        print(f"[Archivist][Mongo] Client init failed (non-fatal): {e}")
+        return None
+
+def _restore_vault_from_mongo():
+    global vector_db, metadata_store, temporal_store
+    client = _get_mongo_client()
+    if not client:
+        return
+    try:
+        db = client.get_default_database() or client["mediaguard"]
+        col = db["ml_vault_backup"]
+        doc = col.find_one({"_id": "latest_vault"})
+        if not doc:
+            print("[Archivist][Mongo] No vault backup found in MongoDB")
+            return
+        
+        meta = doc.get("metadata", {})
+        temp = doc.get("temporal", {})
+        vecs_data = doc.get("vectors", [])
+        
+        if meta and not metadata_store:
+            metadata_store.update(meta)
+            print(f"[Archivist][Mongo] Restored {len(metadata_store)} metadata entries")
+        if temp and not temporal_store:
+            temporal_store.update(temp)
+            print(f"[Archivist][Mongo] Restored {len(temporal_store)} temporal entries")
+        if vecs_data and vector_db.ntotal == 0:
+            arr = np.array(vecs_data, dtype=np.float32)
+            if arr.ndim == 2 and arr.shape[1] == EMBEDDING_DIM:
+                vector_db.add(arr)
+                print(f"[Archivist][Mongo] Restored {vector_db.ntotal} vectors to FAISS")
+    except Exception as e:
+        print(f"[Archivist][Mongo] Vault restore failed (non-fatal): {e}")
+
+def _persist_vault_to_mongo():
+    client = _get_mongo_client()
+    if not client:
+        return
+    def _save():
+        try:
+            db = client.get_default_database() or client["mediaguard"]
+            col = db["ml_vault_backup"]
+            # Extract vector embeddings if feasible
+            vecs_list = []
+            if hasattr(vector_db, "reconstruct") and vector_db.ntotal > 0:
+                try:
+                    for i in range(min(500, vector_db.ntotal)):
+                        vecs_list.append(vector_db.reconstruct(i).tolist())
+                except Exception:
+                    pass
+            col.update_one(
+                {"_id": "latest_vault"},
+                {"$set": {
+                    "updated_at": time.time(),
+                    "vault_size": vector_db.ntotal,
+                    "metadata": metadata_store,
+                    "temporal": temporal_store,
+                    "vectors": vecs_list
+                }},
+                upsert=True
+            )
+            print(f"[Archivist][Mongo] Vault saved to MongoDB ({vector_db.ntotal} vectors, {len(metadata_store)} meta)")
+        except Exception as e:
+            print(f"[Archivist][Mongo] Vault persist failed (non-fatal): {e}")
+    threading.Thread(target=_save, daemon=True).start()
+
+# Trigger background restore on startup
+threading.Thread(target=_restore_vault_from_mongo, daemon=True).start()
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -933,6 +1009,9 @@ def tool_ingest_video(video_path: str) -> str:
             json.dump(temporal_store, f)
         os.replace(tmp_temp, VAULT_TEMPORAL_PATH)
 
+        # Trigger MongoDB backup in background if MONGO_URI set
+        _persist_vault_to_mongo()
+
     except Exception as e:
         for p in [VAULT_INDEX_PATH+".tmp", VAULT_META_PATH+".tmp", VAULT_TEMPORAL_PATH+".tmp"]:
             try: os.remove(p)
@@ -1133,6 +1212,7 @@ def tool_ingest_thumbnails(images: list, video_id: str, source_url: str = "", ti
         with open(VAULT_META_PATH, "a", encoding="utf-8") as f_meta:
             for db_id, entry in new_entries.items():
                 f_meta.write(json.dumps({db_id: entry}) + "\n")
+        _persist_vault_to_mongo()
     except Exception as e:
         print(f"[Archivist] Error saving vault for thumbnail fallback: {e}")
 

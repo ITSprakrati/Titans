@@ -188,6 +188,20 @@ export const runSwarm = async (req, res) => {
 
     const { official_source, threat_nodes = [], country_threat_counts = {} } = huntData.data;
     const platforms_searched = huntData.data?.platforms_searched || [];
+    const platform_results = huntData.data?.platform_results || {};
+
+    // Emit per-platform results/errors to the Live Agent Feed
+    for (const [pName, pData] of Object.entries(platform_results)) {
+      if (pData.status === "error") {
+        io.to(`hunt:${jobId}`).emit("spider:platform_error", {
+          jobId, platform: pName, error: pData.error, message: `Platform ${pName} check failed: ${pData.error?.slice(0, 80) || "error"}`
+        });
+      } else {
+        io.to(`hunt:${jobId}`).emit("spider:platform_result", {
+          jobId, platform: pName, count: pData.count, message: `Scraped ${pName}: found ${pData.count} suspects`
+        });
+      }
+    }
 
     await safeUpdateHuntJob({ jobId }, {
       official_source: official_source

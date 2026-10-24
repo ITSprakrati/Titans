@@ -28,3 +28,4 @@ imageio-ffmpeg==0.5.1
 # onnxruntime 1.20.1 has no cp314 wheel (starts at 1.24.1) -> use latest
 onnxruntime>=1.24.1
 gdown==5.2.0
+pymongo>=4.6.0

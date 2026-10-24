@@ -91,7 +91,7 @@ def _ydl_opts(extra: dict = {}) -> dict:
         "quiet":          True,
         "noplaylist":     True,
         "extract_flat":   False,
-        "socket_timeout": 8,
+        "socket_timeout": 6,
         "extractor_args": {"youtube": {"player_client": ["android", "ios", "web"]}},
         **extra,
     }
@@ -208,12 +208,123 @@ def _generate_search_queries(title: str, official_country: str) -> list[str]:
 # PLATFORM SCRAPERS — VERIFIED & FIXED
 # ═══════════════════════════════════════════════════════════════════════════════
 
-def _scrape_youtube(queries: list[str]) -> list[dict]:
-    """YouTube via yt-dlp ytsearch5 — primary, most reliable."""
+def _scrape_youtube_api(queries: list[str]) -> list[dict]:
+    api_key = os.getenv("YOUTUBE_API_KEY", "").strip()
+    if not api_key:
+        return []
+    nodes, seen = [], set()
+    for query in queries[:2]:
+        try:
+            url = f"https://www.googleapis.com/youtube/v3/search?part=snippet&q={quote_plus(query)}&type=video&maxResults=5&key={api_key}"
+            res = requests.get(url, timeout=6)
+            if res.status_code == 200:
+                data = res.json()
+                for item in data.get("items", []):
+                    vid_id = item.get("id", {}).get("videoId")
+                    if not vid_id or vid_id in seen:
+                        continue
+                    seen.add(vid_id)
+                    snip = item.get("snippet", {})
+                    thumb = snip.get("thumbnails", {}).get("high", {}).get("url") or f"https://i.ytimg.com/vi/{vid_id}/hqdefault.jpg"
+                    nodes.append({
+                        "title": snip.get("title", f"YouTube: {query}"),
+                        "platform": "YouTube",
+                        "account_handle": snip.get("channelTitle", "Unknown Channel"),
+                        "url": f"https://www.youtube.com/watch?v={vid_id}",
+                        "thumbnail_url": thumb,
+                        "country": None,
+                        "coordinates": None,
+                        "view_count": 0,
+                        "description": snip.get("description", "")[:300],
+                    })
+        except Exception as e:
+            print(f"[Spider][YouTube API] error: {e}")
+    return nodes
+
+def _scrape_youtube_innertube(queries: list[str]) -> list[dict]:
+    nodes, seen = [], set()
+    for query in queries[:2]:
+        try:
+            headers = {
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+                "Content-Type": "application/json",
+            }
+            body = {
+                "context": {"client": {"clientName": "WEB", "clientVersion": "2.20231201.00.00", "hl": "en", "gl": "US"}},
+                "query": query
+            }
+            res = requests.post("https://www.youtube.com/youtubei/v1/search", json=body, headers=headers, timeout=6)
+            if res.status_code == 200:
+                text = res.text
+                vid_ids = re.findall(r'"videoId":"([a-zA-Z0-9_-]{11})"', text)
+                titles = re.findall(r'"title":\{"runs":\[\{"text":"([^"]+)"', text)
+                for i, vid in enumerate(vid_ids[:5]):
+                    if vid in seen:
+                        continue
+                    seen.add(vid)
+                    t = titles[i] if i < len(titles) else f"YouTube: {query}"
+                    nodes.append({
+                        "title": t,
+                        "platform": "YouTube",
+                        "account_handle": "YouTube User",
+                        "url": f"https://www.youtube.com/watch?v={vid}",
+                        "thumbnail_url": f"https://i.ytimg.com/vi/{vid}/hqdefault.jpg",
+                        "country": None,
+                        "coordinates": None,
+                        "view_count": 0,
+                        "description": "",
+                    })
+        except Exception as e:
+            print(f"[Spider][YouTube InnerTube] error: {e}")
+    return nodes
+
+def _scrape_youtube_piped(queries: list[str]) -> list[dict]:
+    piped_instances = [
+        "https://pipedapi.kavin.rocks",
+        "https://api.piped.private.coffee",
+        "https://piped-api.garudalinux.org",
+        "https://inv.tux.pizza/api/v1"
+    ]
+    nodes, seen = [], set()
+    for query in queries[:2]:
+        for inst in piped_instances:
+            try:
+                url = f"{inst}/search?q={quote_plus(query)}&type=video" if "/api/v1" in inst else f"{inst}/search?q={quote_plus(query)}&filter=videos"
+                res = requests.get(url, timeout=6, headers=_SCRAPER_HEADERS)
+                if res.status_code == 200:
+                    items = res.json()
+                    if isinstance(items, dict):
+                        items = items.get("items", [])
+                    if isinstance(items, list):
+                        for item in items[:5]:
+                            vid_url = item.get("url", "")
+                            m = re.search(r'(?:v=|\/watch\?v=|\/)([a-zA-Z0-9_-]{11})', vid_url)
+                            vid = m.group(1) if m else item.get("videoId")
+                            if not vid or vid in seen:
+                                continue
+                            seen.add(vid)
+                            nodes.append({
+                                "title": item.get("title", f"YouTube: {query}"),
+                                "platform": "YouTube",
+                                "account_handle": item.get("uploaderName") or item.get("author", "YouTube User"),
+                                "url": f"https://www.youtube.com/watch?v={vid}",
+                                "thumbnail_url": f"https://i.ytimg.com/vi/{vid}/hqdefault.jpg",
+                                "country": None,
+                                "coordinates": None,
+                                "view_count": item.get("views") or 0,
+                                "description": item.get("shortDescription", "")[:300],
+                            })
+                if nodes:
+                    break
+            except Exception:
+                continue
+    return nodes
+
+def _scrape_youtube_ytdlp(queries: list[str]) -> list[dict]:
     nodes, seen = [], set()
     for query in queries:
         try:
-            with yt_dlp.YoutubeDL(_ydl_opts({"extract_flat": True})) as ydl:
+            with yt_dlp.YoutubeDL(_ydl_opts({"extract_flat": True, "socket_timeout": 6})) as ydl:
                 r = ydl.extract_info(f"ytsearch5:{query}", download=False)
                 entries = (r or {}).get("entries", [])
                 for e in entries:
@@ -224,8 +335,20 @@ def _scrape_youtube(queries: list[str]) -> list[dict]:
                         seen.add(url)
                         nodes.append(_make_node(e, "YouTube"))
         except Exception as ex:
-            print(f"[Spider][YouTube] '{query}': {str(ex)[:100]}")
+            print(f"[Spider][YouTube yt-dlp] '{query}': {str(ex)[:100]}")
     return nodes
+
+def _scrape_youtube(queries: list[str]) -> list[dict]:
+    api_res = _scrape_youtube_api(queries)
+    if api_res:
+        return api_res
+    innertube_res = _scrape_youtube_innertube(queries)
+    if innertube_res:
+        return innertube_res
+    piped_res = _scrape_youtube_piped(queries)
+    if piped_res:
+        return piped_res
+    return _scrape_youtube_ytdlp(queries)
 
 
 def _scrape_dailymotion(queries: list[str]) -> list[dict]:
@@ -265,7 +388,7 @@ def _scrape_dailymotion(queries: list[str]) -> list[dict]:
             # Fallback: Dailymotion API
             try:
                 api = f"https://api.dailymotion.com/videos?search={quote_plus(query)}&limit=5&fields=id,title,thumbnail_url,url,owner.screenname,views_total"
-                resp = requests.get(api, headers=_SCRAPER_HEADERS, timeout=10)
+                resp = requests.get(api, headers=_SCRAPER_HEADERS, timeout=6)
                 if resp.status_code == 200:
                     for item in resp.json().get("list", []):
                         vid_url = f"https://www.dailymotion.com/video/{item.get('id','')}"
@@ -304,7 +427,7 @@ def _scrape_reddit(queries: list[str]) -> list[dict]:
             resp = requests.get(url, headers={
                 **_SCRAPER_HEADERS,
                 "User-Agent": "Mozilla/5.0 (compatible; MediaGuard/1.0; +https://mediaguard.app)",
-            }, timeout=12)
+            }, timeout=6)
 
             if resp.status_code == 200:
                 for post in resp.json().get("data", {}).get("children", []):
@@ -352,7 +475,7 @@ def _scrape_reddit(queries: list[str]) -> list[dict]:
         # Method 2: Pushshift (community-run Reddit archive)
         try:
             ps_url = f"https://api.pushshift.io/reddit/search/submission/?q={quote_plus(query)}&size=5&sort=score&is_video=true"
-            resp2 = requests.get(ps_url, headers=_SCRAPER_HEADERS, timeout=10)
+            resp2 = requests.get(ps_url, headers=_SCRAPER_HEADERS, timeout=6)
             if resp2.status_code == 200:
                 for item in resp2.json().get("data", []):
                     reddit_url = f"https://www.reddit.com{item.get('permalink', '')}"
@@ -388,7 +511,7 @@ def _scrape_rumble(queries: list[str]) -> list[dict]:
         # Method 1: Rumble search page scraping
         try:
             search_url = f"https://rumble.com/search/video?q={quote_plus(query)}"
-            resp = requests.get(search_url, headers=_SCRAPER_HEADERS, timeout=12)
+            resp = requests.get(search_url, headers=_SCRAPER_HEADERS, timeout=6)
             if resp.status_code == 200:
                 # Extract video links from HTML
                 video_ids = re.findall(r'href="/([a-z0-9]+-[^"]+\.html)"', resp.text)
@@ -421,7 +544,7 @@ def _scrape_rumble(queries: list[str]) -> list[dict]:
             try:
                 resp2 = requests.get(
                     f"https://rumble.com/api/Media/oembed.json?url=https://rumble.com/search/video?q={quote_plus(query)}",
-                    headers=_SCRAPER_HEADERS, timeout=8
+                    headers=_SCRAPER_HEADERS, timeout=6
                 )
             except Exception:
                 pass
@@ -442,7 +565,7 @@ def _scrape_vimeo(queries: list[str]) -> list[dict]:
             resp = requests.get(api_url, headers={
                 **_SCRAPER_HEADERS,
                 "Accept": "application/vnd.vimeo.*+json;version=3.4",
-            }, timeout=10)
+            }, timeout=6)
 
             if resp.status_code == 200:
                 for item in resp.json().get("data", []):
@@ -474,7 +597,7 @@ def _scrape_vimeo(queries: list[str]) -> list[dict]:
             # Fallback: scrape Vimeo search results
             try:
                 search_url = f"https://vimeo.com/search?q={quote_plus(query)}"
-                resp2 = requests.get(search_url, headers=_SCRAPER_HEADERS, timeout=10)
+                resp2 = requests.get(search_url, headers=_SCRAPER_HEADERS, timeout=6)
                 if resp2.status_code == 200:
                     # Extract clip IDs from Vimeo search page
                     clip_ids = re.findall(r'"id":(\d+),"title"', resp2.text)
@@ -535,7 +658,7 @@ def _scrape_twitch(queries: list[str]) -> list[dict]:
                 api = f"https://api.twitch.tv/helix/search/channels?query={quote_plus(query)}&live_only=false"
                 # Without client-id we can still search clips from known channels
                 clip_search = f"https://www.twitch.tv/search?term={quote_plus(query)}"
-                resp = requests.get(clip_search, headers=_SCRAPER_HEADERS, timeout=8)
+                resp = requests.get(clip_search, headers=_SCRAPER_HEADERS, timeout=6)
                 if resp.status_code == 200:
                     clip_ids = re.findall(r'"id":"([A-Za-z0-9_-]+)","type":"clip"', resp.text)
                     for clip_id in clip_ids[:5]:
@@ -600,7 +723,7 @@ def _scrape_instagram(queries: list[str]) -> list[dict]:
         # Method 1: Google site:instagram.com search
         try:
             g_url = f"https://www.google.com/search?q=site%3Ainstagram.com+{quote_plus(query)}&num=8&tbm=vid"
-            resp = requests.get(g_url, headers=_SCRAPER_HEADERS, timeout=10)
+            resp = requests.get(g_url, headers=_SCRAPER_HEADERS, timeout=6)
             if resp.status_code == 200:
                 # Extract Instagram video URLs
                 ig_reels = re.findall(r'https://www\.instagram\.com/reel/([A-Za-z0-9_-]+)', resp.text)
@@ -671,7 +794,7 @@ def _scrape_twitter(queries: list[str]) -> list[dict]:
         for instance in NITTER_INSTANCES:
             try:
                 search_url = f"https://{instance}/search?q={quote_plus(query)}&f=videos"
-                resp = requests.get(search_url, headers=_SCRAPER_HEADERS, timeout=8)
+                resp = requests.get(search_url, headers=_SCRAPER_HEADERS, timeout=6)
                 if resp.status_code != 200:
                     continue
 
@@ -736,7 +859,7 @@ def _scrape_facebook(queries: list[str]) -> list[dict]:
         if not nodes:
             try:
                 g_url = f"https://www.google.com/search?q=site%3Afacebook.com+{quote_plus(query)}+video&num=5"
-                resp = requests.get(g_url, headers=_SCRAPER_HEADERS, timeout=10)
+                resp = requests.get(g_url, headers=_SCRAPER_HEADERS, timeout=6)
                 if resp.status_code == 200:
                     fb_urls = re.findall(r'https://www\.facebook\.com/(?:watch/\?v=|reel/|video/)(\d+)', resp.text)
                     fb_reel = re.findall(r'https://www\.facebook\.com/reel/(\d+)', resp.text)
@@ -776,7 +899,7 @@ def _scrape_telegram(queries: list[str]) -> list[dict]:
         # Method 1: Google search for Telegram posts
         try:
             g_url = f"https://www.google.com/search?q=site%3At.me+{quote_plus(query)}&num=10"
-            resp = requests.get(g_url, headers=headers, timeout=10)
+            resp = requests.get(g_url, headers=headers, timeout=6)
             if resp.status_code == 200:
                 tg_matches = re.findall(r'https://t\.me/([a-zA-Z0-9_]+)/(\d+)', resp.text)
                 tg_channels = re.findall(r'https://t\.me/([a-zA-Z0-9_]+)(?:/\d+)?', resp.text)
@@ -789,7 +912,7 @@ def _scrape_telegram(queries: list[str]) -> list[dict]:
                     # Try to get thumbnail from t.me/s/ page
                     thumb = ""
                     try:
-                        ch_resp = requests.get(f"https://t.me/s/{channel}", headers=headers, timeout=5)
+                        ch_resp = requests.get(f"https://t.me/s/{channel}", headers=headers, timeout=6)
                         if ch_resp.status_code == 200:
                             thumbs = re.findall(
                                 r'<meta[^>]+property="og:image"[^>]+content="([^"]+)"', ch_resp.text
@@ -865,7 +988,7 @@ def _scrape_torrents(queries: list[str]) -> list[dict]:
         # Method 1: ThePirateBay API (often works without blocks)
         try:
             tpb_url = f"https://apibay.org/q.php?q={quote_plus(query)}&cat=200"  # cat=200 = Video
-            resp = requests.get(tpb_url, headers=_SCRAPER_HEADERS, timeout=10)
+            resp = requests.get(tpb_url, headers=_SCRAPER_HEADERS, timeout=6)
             if resp.status_code == 200:
                 torrents = resp.json()
                 if isinstance(torrents, list):
@@ -902,7 +1025,7 @@ def _scrape_torrents(queries: list[str]) -> list[dict]:
         # Method 2: 1337x via scraping
         try:
             leet_url = f"https://1337x.to/search/{quote_plus(query)}/1/"
-            resp2 = requests.get(leet_url, headers=_SCRAPER_HEADERS, timeout=10)
+            resp2 = requests.get(leet_url, headers=_SCRAPER_HEADERS, timeout=6)
             if resp2.status_code == 200:
                 torrent_links = re.findall(r'href="(/torrent/\d+/[^"]+)"', resp2.text)
                 torrent_names = re.findall(r'class="name"[^>]*>[^<]*<a[^>]+>([^<]+)</a>', resp2.text)
@@ -1026,6 +1149,11 @@ def crawl(official_video_url: str, official_country: str = "US", official_title:
         }
         for future in as_completed(futures):
             platform_name, nodes, error = future.result()
+            map_payload.setdefault("platform_results", {})[platform_name] = {
+                "count": len(nodes),
+                "status": "error" if error else ("success" if len(nodes) > 0 else "empty"),
+                "error": str(error) if error else None
+            }
             if nodes:
                 map_payload["platforms_searched"].append(platform_name)
                 all_nodes.extend(nodes)
