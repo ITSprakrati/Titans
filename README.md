@@ -575,6 +575,20 @@ Push to `main` branch — Render auto-deploys from the configured Dockerfile pat
 
 ---
 
+## Origin and Credits
+
+Builds on MediaGuard Sports (Google Solution Challenge 2026 team). Contributors to the original: <fill in>. Changes in this version:
+- `9e701c3`: Streamline to working scrapers (YouTube, Dailymotion, Reddit, Telegram, Archive, PeerTube) and add Platform Status Matrix panel to ThreatHunter
+- `0dcfd8d`: Default to file upload, require >=12 frames for full video, and label assets Full video or Partial
+- `5fd2e7a`: Resilient YouTube search order, lite ONNX scan batching, 6s fast fail, live feed events, and MongoDB vault sync
+- `6ef1b23`: Increase Mongo timeout to 15s with 10s then 60s retry, add mongoReason to /api/health
+- `09df83f`: Fix archivistController syntax error on startup and add npm run check syntax script
+- `5dd795c`: Guaranteed YouTube thumbnail fallback, direct video file upload, and self-healing asset cards
+- `6d7d607`: Add ML lite mode for Render 512MB tier and unified blueprint
+- `333d73b`: Rebrand to SportGuard AI, optimize video ingestion, and integrate LLM adjudication
+
+---
+
 ## License
 
 This project is open source. All automated enforcement actions require explicit human approval before execution.
