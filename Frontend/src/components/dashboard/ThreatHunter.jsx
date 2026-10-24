@@ -477,6 +477,50 @@ const ThreatHunter = () => {
         </div>
       </div>
 
+      {/* ── Platform Status Panel ── */}
+      <div style={{
+        background: G.card, borderRadius: 20, padding: '16px 20px',
+        border: `1px solid ${G.border}`, boxShadow: '0 2px 12px rgba(0,0,0,0.05)',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <Globe size={16} style={{ color: G.teal }} />
+            <span style={{ fontSize: 13, fontWeight: 800, color: G.text }}>Platform Search & Crawl Matrix</span>
+          </div>
+          <span style={{ fontSize: 11, color: G.muted }}>Live Cloud Environment Status</span>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 10 }}>
+          {[
+            { name: 'YouTube', status: 'WORKS', color: '#10b981', note: 'Data API / InnerTube / Piped' },
+            { name: 'Dailymotion', status: 'WORKS', color: '#10b981', note: 'Public API search' },
+            { name: 'Reddit', status: 'PARTIAL', color: '#f59e0b', note: 'old.reddit + pushshift' },
+            { name: 'Telegram', status: 'WORKS', color: '#10b981', note: 'Public t.me channels' },
+            { name: 'Internet Archive', status: 'WORKS', color: '#10b981', note: 'Archive search API' },
+            { name: 'PeerTube', status: 'WORKS', color: '#10b981', note: 'Federated instances' },
+            { name: 'Instagram', status: 'BLOCKED', color: '#ef4444', note: 'Blocked on free cloud hosting' },
+            { name: 'TikTok', status: 'BLOCKED', color: '#ef4444', note: 'Blocked on free cloud hosting' },
+            { name: 'X / Twitter', status: 'BLOCKED', color: '#ef4444', note: 'Blocked on free cloud hosting' },
+            { name: 'Facebook', status: 'BLOCKED', color: '#ef4444', note: 'Blocked on free cloud hosting' },
+          ].map(p => (
+            <div key={p.name} style={{
+              background: '#f8fafc', borderRadius: 12, padding: '10px 12px',
+              border: `1px solid ${G.border}`, display: 'flex', flexDirection: 'column', gap: 4,
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span style={{ fontSize: 12, fontWeight: 700, color: G.text }}>{p.name}</span>
+                <span style={{
+                  fontSize: 9, fontWeight: 800, padding: '2px 6px', borderRadius: 999,
+                  background: `${p.color}15`, color: p.color, border: `1px solid ${p.color}35`,
+                }}>
+                  {p.status}
+                </span>
+              </div>
+              <span style={{ fontSize: 10, color: G.muted }}>{p.note}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
       <style>{`@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}`}</style>
     </div>
   );

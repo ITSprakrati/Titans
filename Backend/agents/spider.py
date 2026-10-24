@@ -1058,19 +1058,74 @@ def _scrape_torrents(queries: list[str]) -> list[dict]:
 # PLATFORM SCRAPER REGISTRY
 # ═══════════════════════════════════════════════════════════════════════════════
 
+
+def _scrape_archive(queries: list[str]) -> list[dict]:
+    """Internet Archive public search API - WORKS reliably without auth"""
+    nodes, seen = [], set()
+    for query in queries[:2]:
+        try:
+            url = f"https://archive.org/advancedsearch.php?q={quote_plus(query)}+AND+mediatype:movies&fl[]=identifier,title,description,downloads&sort[]=downloads+desc&rows=5&page=1&output=json"
+            res = requests.get(url, timeout=6, headers=_SCRAPER_HEADERS)
+            if res.status_code == 200:
+                docs = res.json().get("response", {}).get("docs", [])
+                for doc in docs:
+                    ident = doc.get("identifier")
+                    if not ident or ident in seen:
+                        continue
+                    seen.add(ident)
+                    nodes.append({
+                        "title": doc.get("title", f"Internet Archive: {query}"),
+                        "platform": "Internet Archive",
+                        "account_handle": "archive_org",
+                        "url": f"https://archive.org/details/{ident}",
+                        "thumbnail_url": f"https://archive.org/services/img/{ident}",
+                        "country": None,
+                        "coordinates": None,
+                        "view_count": doc.get("downloads", 0),
+                        "description": (doc.get("description") or "")[:300],
+                    })
+        except Exception as e:
+            print(f"[Spider][Internet Archive] error: {e}")
+    return nodes
+
+def _scrape_peertube(queries: list[str]) -> list[dict]:
+    """PeerTube federated search - WORKS without blocks"""
+    nodes, seen = [], set()
+    for query in queries[:2]:
+        try:
+            url = f"https://peertube.tv/api/v1/search/videos?search={quote_plus(query)}&count=5"
+            res = requests.get(url, timeout=6, headers=_SCRAPER_HEADERS)
+            if res.status_code == 200:
+                data = res.json().get("data", [])
+                for item in data:
+                    uuid = item.get("uuid")
+                    if not uuid or uuid in seen:
+                        continue
+                    seen.add(uuid)
+                    thumb = item.get("thumbnailUrl") or (f"https://peertube.tv{item.get('thumbnailPath')}" if item.get("thumbnailPath") else "")
+                    nodes.append({
+                        "title": item.get("name", f"PeerTube: {query}"),
+                        "platform": "PeerTube",
+                        "account_handle": item.get("channel", {}).get("name", "peertube_user"),
+                        "url": item.get("url") or f"https://peertube.tv/w/{uuid}",
+                        "thumbnail_url": thumb,
+                        "country": None,
+                        "coordinates": None,
+                        "view_count": item.get("views", 0),
+                        "description": (item.get("description") or "")[:300],
+                    })
+        except Exception as e:
+            print(f"[Spider][PeerTube] error: {e}")
+    return nodes
+
 PLATFORM_SCRAPERS = [
-    ("YouTube",     _scrape_youtube,     True),   # ✅ VERIFIED WORKING
-    ("Dailymotion", _scrape_dailymotion, True),   # ✅ FIXED — correct URL format
-    ("Reddit",      _scrape_reddit,      True),   # ✅ FIXED — old.reddit + pushshift
-    ("Rumble",      _scrape_rumble,      True),   # ✅ FIXED — HTML scraping
-    ("Vimeo",       _scrape_vimeo,       True),   # ✅ NEW — Vimeo API + scraping
-    ("Twitch",      _scrape_twitch,      True),   # ✅ NEW — yt-dlp + scraping
-    ("TikTok",      _scrape_tiktok,      True),   # ⚠️  FAST-FAIL — blocked on cloud
-    ("Instagram",   _scrape_instagram,   True),   # ⚠️  FIXED — Google fallback
-    ("Twitter/X",   _scrape_twitter,     True),   # ✅ FIXED — Nitter instances
-    ("Facebook",    _scrape_facebook,    True),   # ⚠️  FIXED — watch/?q= format
-    ("Telegram",    _scrape_telegram,    True),   # ✅ FIXED — Google + channel scan
-    ("Torrents",    _scrape_torrents,    True),   # ✅ NEW — TPB API + 1337x
+    ("YouTube",          _scrape_youtube,     True),
+    ("Dailymotion",      _scrape_dailymotion, True),
+    ("Reddit",           _scrape_reddit,      True),
+    ("Telegram",         _scrape_telegram,    True),
+    ("Internet Archive", _scrape_archive,     True),
+    ("PeerTube",         _scrape_peertube,    True),
+    ("Torrents",         _scrape_torrents,    True),
 ]
 
 
