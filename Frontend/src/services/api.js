@@ -16,6 +16,7 @@ export const swarmService = {
 // ─── Archivist ────────────────────────────────────────────────────────────────
 export const archivistService = {
   ingest:    (url, title = '') => api.post('/ingest', { official_video_url: url, video_title: title }),
+  upload:    (formData) => api.post('/ingest/upload', formData, { headers: { 'Content-Type': 'multipart/form-data' } }),
   getAll:    ()    => api.get('/ingest'),
   getById:   (id)  => api.get(`/ingest/${id}`),
   delete:    (id)  => api.delete(`/ingest/${id}`),

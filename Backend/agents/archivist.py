@@ -1051,3 +1051,95 @@ def get_temporal_signatures_for_scan() -> list:
         if isinstance(sigs, list):
             all_sigs.extend(sigs)
     return all_sigs
+
+
+def tool_ingest_thumbnails(images: list, video_id: str, source_url: str = "", title: str = "") -> dict:
+    """
+    Guaranteed fallback when full video download is blocked (e.g. YouTube bot check on cloud IPs).
+    Takes a list of PIL.Image objects, file paths, or image URLs, computes CLIP embeddings & pHash,
+    and indexes them in the FAISS vault with partial fingerprint metadata.
+    """
+    global vector_db, metadata_store
+    if not images:
+        return {"success": False, "error": "No images provided for thumbnail fallback"}
+
+    try:
+        import imagehash
+    except ImportError:
+        imagehash = None
+
+    pil_images = []
+    for item in images:
+        try:
+            if isinstance(item, Image.Image):
+                pil_images.append(item.convert("RGB"))
+            elif isinstance(item, str):
+                if os.path.exists(item):
+                    pil_images.append(Image.open(item).convert("RGB"))
+                elif item.startswith("http://") or item.startswith("https://"):
+                    import requests as req
+                    r = req.get(item, timeout=10, headers={"User-Agent": "Mozilla/5.0"})
+                    if r.status_code == 200:
+                        from io import BytesIO
+                        pil_images.append(Image.open(BytesIO(r.content)).convert("RGB"))
+            elif isinstance(item, bytes):
+                from io import BytesIO
+                pil_images.append(Image.open(BytesIO(item)).convert("RGB"))
+        except Exception as e:
+            print(f"[Archivist] Failed to load thumbnail image item: {e}")
+
+    if not pil_images:
+        return {"success": False, "error": "Could not decode any valid thumbnail images"}
+
+    embeddings = _extract_clip_batch(pil_images)
+    if embeddings is None or len(embeddings) == 0:
+        return {"success": False, "error": "Failed to compute CLIP embeddings for thumbnails"}
+
+    phashes = []
+    for img in pil_images:
+        if imagehash is not None:
+            try:
+                phashes.append(str(imagehash.phash(img)))
+            except Exception:
+                phashes.append("")
+        else:
+            phashes.append("")
+
+    start_idx = vector_db.ntotal
+    vector_db.add(embeddings)
+
+    new_entries = {}
+    for idx, (img, emb, ph) in enumerate(zip(pil_images, embeddings, phashes)):
+        db_id = str(start_idx + idx)
+        entry = {
+            "video_id": video_id,
+            "video_path": source_url or f"assets/official/{video_id}.jpg",
+            "timestamp_sec": float(idx),
+            "scene_idx": idx,
+            "screen_capture": False,
+            "screen_confidence": 0.0,
+            "phash": ph,
+            "is_partial": True,
+            "source_type": "youtube_thumbnail_fallback"
+        }
+        metadata_store[db_id] = entry
+        new_entries[db_id] = entry
+
+    try:
+        tmp_faiss = VAULT_INDEX_PATH + ".tmp"
+        faiss.write_index(vector_db, tmp_faiss)
+        os.replace(tmp_faiss, VAULT_INDEX_PATH)
+
+        with open(VAULT_META_PATH, "a", encoding="utf-8") as f_meta:
+            for db_id, entry in new_entries.items():
+                f_meta.write(json.dumps({db_id: entry}) + "\n")
+    except Exception as e:
+        print(f"[Archivist] Error saving vault for thumbnail fallback: {e}")
+
+    return {
+        "success": True,
+        "frame_count": len(pil_images),
+        "vault_size": vector_db.ntotal,
+        "partial": True,
+        "message": "[SUCCESS] Partial: thumbnail fingerprint (YouTube blocked full download)"
+    }

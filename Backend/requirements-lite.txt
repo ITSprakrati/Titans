@@ -4,7 +4,8 @@ pydantic==2.10.4
 python-dotenv==1.0.1
 groq>=0.11.0
 google-generativeai>=0.8.3
-yt-dlp>=2025.1.15
+yt-dlp>=2025.2.19
+python-multipart>=0.0.18
 opencv-python-headless>=4.10.0
 faiss-cpu>=1.9.0
 Pillow>=10.4.0

@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, BackgroundTasks
+from fastapi import FastAPI, HTTPException, BackgroundTasks, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional, Dict, Any
@@ -29,7 +29,7 @@ try:
 except Exception as _e:
     print(f"[Startup] ffmpeg setup warning: {_e}")
 
-from agents.archivist import tool_ingest_video, vector_db
+from agents.archivist import tool_ingest_video, tool_ingest_thumbnails, vector_db
 from agents.spider import crawl
 from agents.sentinel import scan_thumbnail, scan_suspect, MATCH_THRESHOLD, SUSPECT_THRESHOLD
 from agents.adjudicator import adjudicate, batch_adjudicate
@@ -821,125 +821,112 @@ def ingest_asset(payload: IngestRequest, background_tasks: BackgroundTasks):
                 title = provided_title or url.split("/")[-1].split("?")[0].rsplit(".", 1)[0] or "Official Video"
 
             else:
-                # ── Platform URL — use yt-dlp (with Cobalt/Apify fallback) ──────────
+                # ── Platform URL — use yt-dlp (with player client fallbacks & thumbnail mode) ──
                 local_path = None
                 title = provided_title or "Unknown"
 
-                # Ensure cookies are parsed if env var is set
                 _setup_cookies()
                 is_youtube = any(h in url.lower() for h in ("youtube.com", "youtu.be"))
                 has_cookies = os.path.exists(COOKIES_PATH) and os.path.getsize(COOKIES_PATH) > 10
                 has_apify = bool(os.getenv("APIFY_API_TOKEN", "").strip())
 
-                # If on YouTube and neither cookies nor Apify token are present, fail early with friendly message
-                if is_youtube and not has_cookies and not has_apify:
-                    _write_job(job_id, {
-                        "status": "failed",
-                        "message": "YouTube blocked the server. Use a direct .mp4 link, or upload the file instead."
-                    })
-                    return
-
-                # --- Try Apify first for all platform URLs (bypasses IP blocks) ---
-                apify_success = False
-                apify_success, apify_title = _try_apify_download(url, job_id, OFFICIAL_DIR)
-                if apify_success:
-                    matches = glob.glob(os.path.join(OFFICIAL_DIR, f"{job_id}.*"))
-                    if matches:
-                        local_path = matches[0]
-                        if apify_title and len(apify_title) > 5:
-                            title = apify_title
-                        print(f"[Ingest] Apify download succeeded: {local_path}")
-
-                # --- Fallback: yt-dlp direct download ---
-                if not apify_success:
-                    last_hook_time = [0.0]
-                    def _progress_hook(d):
-                        import time
-                        now = time.time()
-                        if now - last_hook_time[0] < 1.5:
-                            return
-                        last_hook_time[0] = now
-                        if d.get("status") == "downloading":
-                            downloaded = d.get("downloaded_bytes") or 0
-                            total = d.get("total_bytes") or d.get("total_bytes_estimate") or 0
-                            mb = downloaded / (1024 * 1024)
-                            if total > 0:
-                                total_mb = total / (1024 * 1024)
-                                pct = min(99.0, round((downloaded / total) * 100, 1))
-                                msg = f"Downloading stream: {pct}% ({mb:.1f}MB / {total_mb:.1f}MB)"
-                            else:
-                                msg = f"Downloading stream: {mb:.1f}MB transferred..."
-                            _write_job(job_id, {"status": "downloading", "message": msg})
-                        elif d.get("status") == "finished":
-                            _write_job(job_id, {"status": "processing", "message": "Download complete. Extracting scene frames..."})
-
-                    ydl_opts = {
-                        "outtmpl":        os.path.join(OFFICIAL_DIR, f"{job_id}.%(ext)s"),
-                        "format":         "bestvideo[height<=720]+bestaudio/bestvideo[height<=480]+bestaudio/best[height<=720]/best[height<=480]/bestvideo+bestaudio/best",
-                        "quiet":          False,
-                        "no_warnings":    False,
-                        "noplaylist":     True,
-                        "retries":        2,
-                        "socket_timeout": 15,
-                        "extractor_args": {"youtube": {"player_client": ["android", "ios", "web"]}},
-                        "progress_hooks": [_progress_hook],
-                    }
-                    # Add ffmpeg location for post-processing and live stream capture
-                    try:
-                        from agents.audio_fingerprint import _get_ffmpeg_exe
-                        _ffmpeg = _get_ffmpeg_exe()
-                        if _ffmpeg:
-                            bin_dir = os.path.dirname(_ffmpeg)
-                            ffmpeg_bin = os.path.join(bin_dir, "ffmpeg.exe")
-                            if not os.path.exists(ffmpeg_bin):
-                                ffmpeg_bin = _ffmpeg
-                            ydl_opts["ffmpeg_location"] = bin_dir
-
-                            # Check if URL is an ongoing live stream or long match broadcast
-                            with yt_dlp.YoutubeDL({"quiet": True, "noplaylist": True, "ffmpeg_location": bin_dir, "extractor_args": {"youtube": {"player_client": ["android", "ios", "web"]}}}) as ydl_info:
-                                meta = ydl_info.extract_info(url, download=False)
-                                is_live = meta.get("is_live") or meta.get("live_status") == "is_live"
-                                duration = meta.get("duration") or 0
-                                if meta.get("title") and len(meta.get("title")) > 5:
-                                    title = meta.get("title")
-
-                            if is_live or duration > 600:
-                                seg_sec = "90" if is_live else "180"
-                                print(f"[Ingest] Live stream or long match detected (is_live={is_live}, dur={duration}s). Capturing {seg_sec}s reference segment.")
-                                ydl_opts["external_downloader"] = {"default": ffmpeg_bin}
-                                ydl_opts["external_downloader_args"] = {"ffmpeg": ["-t", seg_sec], "ffmpeg_o": ["-t", seg_sec]}
-                                _write_job(job_id, {"status": "downloading", "message": f"Capturing {seg_sec}s broadcast segment for fingerprinting..."})
-                    except Exception as meta_e:
-                        print(f"[Ingest] Meta pre-check note: {meta_e}")
-                    # YouTube cookie authentication — only if cookiefile exists or explicitly set
-                    if os.path.exists(COOKIES_PATH):
-                        ydl_opts["cookiefile"] = COOKIES_PATH
-                    elif os.environ.get("YT_COOKIES_BROWSER"):
-                        ydl_opts["cookiesfrombrowser"] = (os.environ["YT_COOKIES_BROWSER"],)
-
-                    try:
-                        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                            info  = ydl.extract_info(url, download=True)
-                            real_title = info.get("title", "")
-                            if real_title and len(real_title) > 5:
-                                title = real_title
-
+                # --- 1. Try Apify if token configured ---
+                if has_apify:
+                    apify_success, apify_title = _try_apify_download(url, job_id, OFFICIAL_DIR)
+                    if apify_success:
                         matches = glob.glob(os.path.join(OFFICIAL_DIR, f"{job_id}.*"))
                         if matches:
                             local_path = matches[0]
-                    except Exception as yt_err:
-                        print(f"[Ingest] Direct download error: {yt_err}")
-                        matches = glob.glob(os.path.join(OFFICIAL_DIR, f"{job_id}.*"))
-                        if matches:
-                            local_path = matches[0]
-                        else:
-                            err_str = str(yt_err).lower()
-                            if is_youtube or any(k in err_str for k in ("bot", "sign in", "429", "too many requests", "confirm", "blocked", "captcha")):
-                                friendly_msg = "YouTube blocked the server. Use a direct .mp4 link, or upload the file instead."
-                            else:
-                                friendly_msg = f"Failed to download video from {url}: {yt_err}"
-                            _write_job(job_id, {"status": "failed", "message": friendly_msg})
-                            return
+                            if apify_title and len(apify_title) > 5:
+                                title = apify_title
+                            print(f"[Ingest] Apify download succeeded: {local_path}")
+
+                # --- 2. Try yt-dlp with player_client fallbacks ---
+                if not local_path:
+                    # Sequential client fallbacks for YouTube: android, ios, tv, web_safari, mweb
+                    clients_to_try = ["android", "ios", "tv", "web_safari", "mweb"] if is_youtube else ["web"]
+                    
+                    for client in clients_to_try:
+                        print(f"[Ingest] Attempting yt-dlp with player_client='{client}'...")
+                        ydl_opts = {
+                            "outtmpl":        os.path.join(OFFICIAL_DIR, f"{job_id}.%(ext)s"),
+                            "format":         "bestvideo[height<=720]+bestaudio/bestvideo[height<=480]+bestaudio/best[height<=720]/best[height<=480]/bestvideo+bestaudio/best",
+                            "quiet":          True,
+                            "no_warnings":    True,
+                            "noplaylist":     True,
+                            "retries":        1,
+                            "socket_timeout": 15,
+                            "extractor_args": {"youtube": {"player_client": [client]}},
+                        }
+                        if has_cookies:
+                            ydl_opts["cookiefile"] = COOKIES_PATH
+
+                        try:
+                            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                                info = ydl.extract_info(url, download=True)
+                                real_title = info.get("title", "")
+                                if real_title and len(real_title) > 5:
+                                    title = real_title
+                            matches = glob.glob(os.path.join(OFFICIAL_DIR, f"{job_id}.*"))
+                            if matches and os.path.getsize(matches[0]) >= 10000:
+                                local_path = matches[0]
+                                print(f"[Ingest] yt-dlp succeeded with client '{client}': {local_path}")
+                                break
+                        except Exception as yt_err:
+                            print(f"[Ingest] yt-dlp client '{client}' failed: {yt_err}")
+                            continue
+
+                # --- 3. GUARANTEED FALLBACK: YouTube Thumbnail Mode ---
+                # If cloud IP is completely blocked by YouTube, ingest high-res thumbnails
+                if not local_path and is_youtube:
+                    print(f"[Ingest] Full video download blocked by YouTube. Activating Guaranteed Thumbnail Fallback...")
+                    _write_job(job_id, {"status": "processing", "message": "YouTube blocked full video. Fingerprinting official high-res thumbnails..."})
+                    
+                    # Extract video ID
+                    yt_match = re.search(r'(?:v=|\/)([0-9A-Za-z_-]{11})', url)
+                    yt_id = yt_match.group(1) if yt_match else ""
+
+                    # Fetch real title via oEmbed
+                    yt_title = provided_title
+                    if yt_id:
+                        try:
+                            import requests as _rq
+                            oemb = _rq.get(f"https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v={yt_id}&format=json", timeout=8)
+                            if oemb.status_code == 200:
+                                yt_title = oemb.json().get("title") or yt_title
+                        except Exception as oe:
+                            print(f"[Ingest] oEmbed title lookup note: {oe}")
+
+                    final_title = yt_title or title or f"YouTube Video ({yt_id})"
+
+                    # Fetch available CDN thumbnails (never blocked by bot checks)
+                    thumb_urls = [
+                        f"https://i.ytimg.com/vi/{yt_id}/maxresdefault.jpg",
+                        f"https://i.ytimg.com/vi/{yt_id}/sddefault.jpg",
+                        f"https://i.ytimg.com/vi/{yt_id}/hqdefault.jpg",
+                        f"https://i.ytimg.com/vi/{yt_id}/0.jpg",
+                    ]
+                    
+                    thumb_res = tool_ingest_thumbnails(thumb_urls, job_id, source_url=url, title=final_title)
+                    if thumb_res.get("success"):
+                        tx_h = f"0x{hashlib.sha256(job_id.encode()).hexdigest()}"
+                        _write_job(job_id, {
+                            "status": "complete",
+                            "partial": True,
+                            "title": final_title,
+                            "local_path": f"https://i.ytimg.com/vi/{yt_id}/maxresdefault.jpg",
+                            "frame_count": thumb_res["frame_count"],
+                            "vault_size": thumb_res["vault_size"],
+                            "tx_hash": tx_h,
+                            "message": "[SUCCESS] Partial: thumbnail fingerprint (YouTube blocked full download)"
+                        })
+                        return
+                    else:
+                        _write_job(job_id, {
+                            "status": "failed",
+                            "message": "YouTube blocked the server. Use a direct .mp4 link, or upload the file instead."
+                        })
+                        return
 
                 if not local_path or not os.path.exists(local_path):
                     msg = "YouTube blocked the server. Use a direct .mp4 link, or upload the file instead." if is_youtube else f"Video file could not be located after download from {url}"
@@ -1014,6 +1001,81 @@ def ingest_status(job_id: str):
     if not job:
         raise HTTPException(status_code=404, detail=f"Job {job_id} not found")
     return {"success": True, "job_id": job_id, **job}
+
+
+@app.post("/ingest/upload")
+async def ingest_upload(
+    file: UploadFile = File(...),
+    video_title: str = Form(""),
+):
+    """
+    Direct file upload ingestion (up to 100MB).
+    Saves file to assets/official/{job_id}.mp4 and triggers full scene ingest in background.
+    """
+    import uuid
+    job_id = f"upload_{uuid.uuid4().hex[:8]}"
+    ext = os.path.splitext(file.filename)[1].lower() if file.filename else ".mp4"
+    if ext not in (".mp4", ".mov", ".webm", ".avi", ".mkv"):
+        raise HTTPException(status_code=400, detail="Unsupported video format. Only mp4, mov, webm, avi, mkv allowed.")
+
+    local_path = os.path.join(OFFICIAL_DIR, f"{job_id}{ext}")
+    _write_job(job_id, {"status": "processing", "message": "Saving uploaded video file..."})
+
+    try:
+        with open(local_path, "wb") as f:
+            while chunk := await file.read(1024 * 1024):
+                f.write(chunk)
+    except Exception as e:
+        _write_job(job_id, {"status": "failed", "message": f"Failed to save uploaded file: {e}"})
+        raise HTTPException(status_code=500, detail=f"File save error: {e}")
+
+    file_size = os.path.getsize(local_path)
+    if file_size < 1000:
+        os.remove(local_path)
+        raise HTTPException(status_code=400, detail="Uploaded file is too small or empty.")
+
+    title = video_title.strip() or os.path.splitext(file.filename)[0] or "Uploaded Video"
+
+    def _run_upload():
+        pause_watchdog()
+        try:
+            _write_job(job_id, {"status": "processing", "message": "Extracting and embedding frames..."})
+            result = tool_ingest_video(local_path)
+            if "[ERROR]" in result:
+                _write_job(job_id, {"status": "failed", "message": result})
+                return
+
+            frame_count = 0
+            if "Scenes=" in result:
+                frame_count = int(result.split("Scenes=")[1].split(",")[0])
+            elif "Extracted" in result:
+                frame_count = int(result.split("Extracted")[1].split("frames")[0].strip())
+
+            tx_hash = "0x" + np.random.bytes(32).hex()
+            _write_job(job_id, {
+                "status":      "complete",
+                "title":       title,
+                "local_path":  local_path,
+                "frame_count": frame_count,
+                "vault_size":  vector_db.ntotal,
+                "tx_hash":     tx_hash,
+                "message":     result,
+            })
+        except Exception as e:
+            print(f"[Upload Ingest] Error: {e}")
+            _write_job(job_id, {"status": "failed", "message": str(e)})
+        finally:
+            resume_watchdog()
+
+    threading.Thread(target=_run_upload, daemon=True).start()
+
+    return {
+        "success": True,
+        "job_id": job_id,
+        "status": "processing",
+        "title": title,
+        "message": "File uploaded successfully. Processing scene frames."
+    }
 
 
 # ─── Hunt ─────────────────────────────────────────────────────────────────────

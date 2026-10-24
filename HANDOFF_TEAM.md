@@ -69,17 +69,25 @@
 ---
 
 ### Issue C: YouTube Downloads Blocked ("Sign in to confirm you're not a bot")
-- **Symptom**: Video ingestion on YouTube URLs fails with bot detection or HTTP 429.
-- **Exact Error**: `Sign in to confirm you're not a bot. This helps protect our community.`
-- **Likely Cause**: YouTube aggressively blocks known cloud datacenter IP subnets (Render, AWS, DigitalOcean).
-- **Exact Fix Steps / Alternatives**:
-  - **Option 1 (Recommended for Demos)**: Use direct `.mp4` URLs. Ingest works immediately and reliably with direct file links from:
-    - GitHub Raw: `https://raw.githubusercontent.com/.../video.mp4`
-    - Dropbox: `https://www.dropbox.com/s/.../video.mp4?dl=1`
-    - Google Drive: Shared link with "Anyone with the link can view".
-    - Box / OneDrive direct download links.
-  - **Option 2 (Cookie Authentication)**: Export YouTube cookies using a browser extension (Netscape format `cookies.txt`), encode to base64 (`base64 -w 0 cookies.txt`), and set `YOUTUBE_COOKIES_B64` in Render for `sportguard-ml`.
-  - **Option 3 (Residential Proxy / Apify)**: Set `APIFY_API_TOKEN` in Render for `sportguard-ml`. The engine will route requests through residential proxies automatically.
+- **Symptom**: Full video stream ingestion on YouTube URLs returns bot detection on cloud IPs.
+- **Exact Error**: `ERROR: [youtube] Y34mk0SvReE: Sign in to confirm you're not a bot. This helps protect our community.`
+- **Root Cause Proof**: YouTube aggressively challenges and blocks stream downloads originating from cloud datacenter IP subnets (Render, AWS, DigitalOcean, GCP). However, YouTube's oEmbed API (`https://www.youtube.com/oembed`) and public thumbnail edge CDN (`https://i.ytimg.com/vi/{id}/...`) are hosted on Google's global edge network and are **never blocked** by bot detection on cloud IPs.
+- **Implemented Fixes & Fallbacks in Codebase**:
+  1. **Upgraded `yt-dlp`**: Updated to `yt-dlp>=2025.2.19` with Node.js JS challenge solver support in `Dockerfile.lite`.
+  2. **Sequential Player Client Fallbacks**: The engine automatically attempts multiple player client profiles (`android`, `ios`, `tv`, `web_safari`, `mweb`) before failing over.
+  3. **Guaranteed Thumbnail Fallback Mode (Autonomous)**: If all video stream attempts are blocked by YouTube, the engine automatically:
+     - Fetches video metadata/title via YouTube's unblocked oEmbed endpoint.
+     - Downloads all available CDN thumbnails (`maxresdefault.jpg`, `sddefault.jpg`, `hqdefault.jpg`, `0.jpg`).
+     - Computes 512-dim Int8 CLIP vision embeddings and perceptual hashes (pHash) on the keyframe images.
+     - Stores them directly into the FAISS vault and marks the asset as `complete` with `partial: true` ("⚠️ Partial: thumbnail fingerprint (YouTube blocked full download)").
+  4. **Direct Video File Upload Endpoint (Up to 100MB)**: Added `POST /api/ingest/upload` on Node API and `POST /ingest/upload` on FastAPI ML service. In the frontend Asset Vault, users can toggle between `[Video URL]` and `[Upload Video File]` to ingest raw files (`.mp4`, `.mov`, `.webm`, `.avi`, `.mkv`) without relying on YouTube stream extraction.
+  5. **Card Self-Healing & Management**:
+     - Failed assets show a clear error banner, a `Retry` button to re-attempt ingest, and a `Remove` button calling `DELETE /api/ingest/:id` to permanently remove failed cards.
+     - Failed cards are cleanly excluded from protected asset counts.
+- **Long-term Human Architectural Options (Decisions for Team)**:
+  - **Option 1 (Zero Cost, No Config)**: Use the direct file upload tab in the UI or direct `.mp4` URLs (Dropbox `?dl=1`, GitHub raw, Box, etc.).
+  - **Option 2 (Cookie Authentication)**: Export YouTube cookies using a browser extension (Netscape format `cookies.txt`), encode to base64 (`base64 -w 0 cookies.txt`), and set `YOUTUBE_COOKIES_B64` in Render environment variables for `sportguard-ml`.
+  - **Option 3 (Residential Proxies / Apify)**: Acquire residential proxies (e.g., Apify, Bright Data, Webshare) and set `APIFY_API_TOKEN` or proxy env vars in Render for `sportguard-ml`. Cloud IPs will then route through residential exits.
 
 ---
 

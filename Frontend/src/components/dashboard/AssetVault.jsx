@@ -5,7 +5,7 @@ import { useSocket } from '../../context/SocketContext';
 import { archivistService, streamService } from '../../services/api';
 import {
   Plus, Link as LinkIcon, Database, CheckCircle, ExternalLink,
-  Loader2, AlertTriangle, Hash, Shield, Layers, Clock, RefreshCw, Trash2, X,
+  Loader2, AlertTriangle, Hash, Shield, Layers, Clock, RefreshCw, Trash2, X, Upload,
 } from 'lucide-react';
 
 const G = {
@@ -28,6 +28,7 @@ const STATUS_CFG = {
   processing:  { color: '#73A5CA', bg: 'rgba(115,165,202,0.12)',  border: 'rgba(115,165,202,0.35)',   label: 'PROCESSING'  },
   downloading: { color: '#FFC81E', bg: 'rgba(255,200,30,0.15)',   border: 'rgba(255,200,30,0.4)',     label: 'DOWNLOADING' },
   failed:      { color: '#ef4444', bg: 'rgba(239,68,68,0.08)',    border: 'rgba(239,68,68,0.2)',       label: 'FAILED'      },
+  partial:     { color: '#FFC81E', bg: 'rgba(255,200,30,0.15)',   border: 'rgba(255,200,30,0.4)',     label: 'PARTIAL'     },
 };
 
 const STAGES = ['queued', 'downloading', 'processing', 'complete'];
@@ -155,7 +156,7 @@ const DeleteConfirm = ({ asset, onConfirm, onCancel, deleting }) => (
 );
 
 // ─── Asset card ───────────────────────────────────────────────────────────────
-const AssetCard = ({ asset, onDelete }) => {
+const AssetCard = ({ asset, onDelete, onRetry }) => {
   const s = STATUS_CFG[asset.status] || STATUS_CFG.processing;
   const thumbId = asset.official_video_url?.match(/(?:v=|youtu\.be\/)([^&?/]+)/)?.[1];
   const thumb   = thumbId ? `https://i.ytimg.com/vi/${thumbId}/mqdefault.jpg` : null;
@@ -268,38 +269,99 @@ const AssetCard = ({ asset, onDelete }) => {
           )}
         </div>
 
+        {/* If failed, show alert banner */}
+        {asset.status === 'failed' && (
+          <div style={{
+            marginTop: 4, marginBottom: 12, padding: '8px 10px', borderRadius: 8,
+            background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.2)',
+            fontSize: 11, color: '#ef4444', lineHeight: 1.4,
+          }}>
+            <p style={{ margin: '0 0 4px', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 5 }}>
+              <AlertTriangle size={12} /> Ingest Failed
+            </p>
+            <p style={{ margin: 0, fontSize: 10, color: '#b91c1c' }}>{asset.error_message || 'Video download or processing failed.'}</p>
+          </div>
+        )}
+
+        {/* If partial fallback */}
+        {asset.status === 'partial' && (
+          <div style={{
+            marginTop: 4, marginBottom: 12, padding: '6px 10px', borderRadius: 8,
+            background: 'rgba(255,200,30,0.1)', border: '1px solid rgba(255,200,30,0.3)',
+            fontSize: 10, color: '#b45309', lineHeight: 1.4, fontWeight: 600,
+          }}>
+            ⚠️ Partial: thumbnail fingerprint (YouTube blocked full download)
+          </div>
+        )}
+
         {/* Actions */}
         <div style={{ display: 'flex', gap: 8, borderTop: `1px solid ${G.border}`, paddingTop: 12 }}>
-          <div style={{
-            flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-            padding: '7px 0', borderRadius: 9, background: G.tealBg, border: `1px solid ${G.tealBdr}`,
-            fontSize: 10, fontWeight: 700, color: G.teal,
-          }}>
-            <Shield size={11} /> Fingerprint Active
-          </div>
-          {asset.official_video_url && (
-            <a href={asset.official_video_url} target="_blank" rel="noreferrer"
-              style={{
-                padding: '7px 10px', borderRadius: 9, border: `1px solid ${G.border}`,
-                background: 'transparent', display: 'flex', alignItems: 'center',
+          {asset.status === 'failed' ? (
+            <>
+              {onRetry && (
+                <button
+                  type="button"
+                  onClick={() => onRetry(asset)}
+                  style={{
+                    flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                    padding: '7px 0', borderRadius: 9, background: '#f8fafc', border: `1px solid ${G.border}`,
+                    fontSize: 11, fontWeight: 700, color: G.text, cursor: 'pointer',
+                  }}>
+                  <RefreshCw size={11} /> Retry
+                </button>
+              )}
+              <motion.button
+                whileHover={{ scale: 1.05, background: 'rgba(239,68,68,0.1)' }}
+                whileTap={{ scale: 0.95 }}
+                type="button"
+                onClick={() => onDelete(asset)}
+                title="Remove failed asset"
+                style={{
+                  padding: '7px 12px', borderRadius: 9,
+                  border: '1px solid rgba(239,68,68,0.3)',
+                  background: 'rgba(239,68,68,0.06)', cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 700, color: '#ef4444',
+                }}>
+                <Trash2 size={12} /> Remove
+              </motion.button>
+            </>
+          ) : (
+            <>
+              <div style={{
+                flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                padding: '7px 0', borderRadius: 9,
+                background: asset.status === 'partial' ? 'rgba(255,200,30,0.1)' : G.tealBg,
+                border: `1px solid ${asset.status === 'partial' ? 'rgba(255,200,30,0.3)' : G.tealBdr}`,
+                fontSize: 10, fontWeight: 700,
+                color: asset.status === 'partial' ? '#b45309' : G.teal,
               }}>
-              <ExternalLink size={13} style={{ color: G.sub }} />
-            </a>
+                <Shield size={11} /> {asset.status === 'partial' ? 'Partial Fingerprint' : 'Fingerprint Active'}
+              </div>
+              {asset.official_video_url && !asset.official_video_url.startsWith('upload://') && (
+                <a href={asset.official_video_url} target="_blank" rel="noreferrer"
+                  style={{
+                    padding: '7px 10px', borderRadius: 9, border: `1px solid ${G.border}`,
+                    background: 'transparent', display: 'flex', alignItems: 'center',
+                  }}>
+                  <ExternalLink size={13} style={{ color: G.sub }} />
+                </a>
+              )}
+              <motion.button
+                whileHover={{ scale: 1.05, background: 'rgba(239,68,68,0.08)' }}
+                whileTap={{ scale: 0.95 }}
+                type="button"
+                onClick={() => onDelete(asset)}
+                title="Delete from vault"
+                style={{
+                  padding: '7px 10px', borderRadius: 9,
+                  border: '1px solid rgba(239,68,68,0.2)',
+                  background: 'transparent', cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', transition: 'all 0.15s',
+                }}>
+                <Trash2 size={13} style={{ color: '#ef4444' }} />
+              </motion.button>
+            </>
           )}
-          {/* Delete button */}
-          <motion.button
-            whileHover={{ scale: 1.05, background: 'rgba(239,68,68,0.08)' }}
-            whileTap={{ scale: 0.95 }}
-            onClick={() => onDelete(asset)}
-            title="Delete from vault"
-            style={{
-              padding: '7px 10px', borderRadius: 9,
-              border: '1px solid rgba(239,68,68,0.2)',
-              background: 'transparent', cursor: 'pointer',
-              display: 'flex', alignItems: 'center', transition: 'all 0.15s',
-            }}>
-            <Trash2 size={13} style={{ color: '#ef4444' }} />
-          </motion.button>
         </div>
       </div>
     </motion.div>
@@ -311,7 +373,9 @@ const AssetVault = () => {
   const { assets, refresh, setLiveMonitorActive } = useDashboard();
   const { eventLog, joinIngest } = useSocket();
 
+  const [mode,          setMode]          = useState('url'); // 'url' | 'file'
   const [url,           setUrl]           = useState('');
+  const [selectedFile,  setSelectedFile]  = useState(null);
   const [title,         setTitle]         = useState('');
   const [loading,       setLoading]       = useState(false);
   const [error,         setError]         = useState('');
@@ -323,6 +387,16 @@ const AssetVault = () => {
   const [deleteTarget,  setDeleteTarget]  = useState(null);  // asset object to confirm
   const [deleting,      setDeleting]      = useState(false);
   const [deleteError,   setDeleteError]   = useState('');
+
+  const handleRetry = (asset) => {
+    if (asset?.official_video_url && !asset.official_video_url.startsWith('upload://')) {
+      setMode('url');
+      setUrl(asset.official_video_url);
+      setTitle(asset.title || '');
+      setError('');
+      window.scrollTo({ top: 150, behavior: 'smooth' });
+    }
+  };
 
   const handleDeleteClick = (asset) => {
     setDeleteTarget(asset);
@@ -456,7 +530,61 @@ const AssetVault = () => {
     }
   };
 
-  const totalVectors = assets.reduce((s, a) => s + (a.vault_size || 0), 0);
+  const handleUpload = async (e) => {
+    e.preventDefault();
+    if (!selectedFile) {
+      setError('Please select a video file (.mp4, .mov, .webm, .avi, .mkv).');
+      return;
+    }
+    if (selectedFile.size > 100 * 1024 * 1024) {
+      setError(`File is too large (${(selectedFile.size / (1024 * 1024)).toFixed(1)} MB). Limit is 100 MB.`);
+      return;
+    }
+    setError('');
+    setLoading(true);
+    setProgress({ stage: 'processing', message: 'Uploading video file to server…' });
+
+    const formData = new FormData();
+    formData.append('video', selectedFile);
+    formData.append('video_title', title.trim() || selectedFile.name.replace(/\.[^/.]+$/, ''));
+
+    try {
+      const res = await archivistService.upload(formData);
+      const { jobId, assetId } = res.data;
+      setActiveJob(jobId);
+      setActiveAssetId(assetId);
+      joinIngest(jobId);
+      setSelectedFile(null);
+      setTitle('');
+
+      const pollInterval = setInterval(async () => {
+        try {
+          const assetRes = await archivistService.getById(assetId);
+          const asset = assetRes?.data?.data;
+          if (asset?.status === 'complete' || asset?.status === 'partial') {
+            clearInterval(pollInterval);
+            setProgress({ stage: 'complete', message: `"${asset.title}" — ${asset.frame_count} frames stored.` });
+            setTimeout(() => { setProgress(null); setActiveJob(null); setActiveAssetId(null); setLoading(false); refresh(); }, 2000);
+          } else if (asset?.status === 'failed') {
+            clearInterval(pollInterval);
+            setError(asset.error_message || 'File processing failed.');
+            setProgress(null); setActiveJob(null); setActiveAssetId(null); setLoading(false);
+          } else if (asset?.status === 'processing') {
+            setProgress({ stage: 'processing', message: `Processing frames… (${asset.frame_count || 0} extracted so far)` });
+          }
+        } catch { /* ignore */ }
+      }, 10000);
+
+      setTimeout(() => clearInterval(pollInterval), 30 * 60 * 1000);
+    } catch (err) {
+      setError(err?.response?.data?.message || 'File upload failed. Is the server running?');
+      setProgress(null); setLoading(false);
+    }
+  };
+
+  const validAssets = assets.filter(a => a.status !== 'failed');
+  const totalVectors = validAssets.reduce((s, a) => s + (a.vault_size || 0), 0);
+  const protectedCount = assets.filter(a => a.status === 'complete' || a.status === 'partial').length;
 
   return (
     <div style={{ color: G.text }}>
@@ -464,9 +592,9 @@ const AssetVault = () => {
       {/* Stats row */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14, marginBottom: 20 }}>
         {[
-          { label: 'Assets Vaulted',  value: assets.length,                                          color: G.blue    },
+          { label: 'Assets Vaulted',  value: validAssets.length,                                      color: G.blue    },
           { label: 'Total Vectors',   value: totalVectors > 0 ? totalVectors.toLocaleString() : '—', color: G.gold    },
-          { label: 'Protected',       value: assets.filter(a => a.status === 'complete').length,      color: G.teal    },
+          { label: 'Protected',       value: protectedCount,                                         color: G.teal    },
         ].map(({ label, value, color }) => (
           <motion.div key={label} whileHover={{ y: -2 }}
             style={{
@@ -500,52 +628,125 @@ const AssetVault = () => {
           </button>
         </div>
 
-        <form onSubmit={handleIngest} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          <div style={{ display: 'flex', gap: 10 }}>
-            <div style={{ flex: 1, position: 'relative' }}>
-              <LinkIcon size={14} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: G.muted }} />
-              <input
-                type="url" value={url} onChange={e => setUrl(e.target.value)}
-                placeholder="Direct .mp4 link (Dropbox dl=1, GitHub raw, Google Drive, Box), or YouTube URL"
-                disabled={loading} required
+        {/* Mode Toggle: URL vs Upload */}
+        <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
+          <button
+            type="button"
+            onClick={() => { setMode('url'); setError(''); }}
+            style={{
+              padding: '6px 14px', borderRadius: 9,
+              background: mode === 'url' ? G.tealBg : 'transparent',
+              border: `1px solid ${mode === 'url' ? G.tealBdr : G.border}`,
+              color: mode === 'url' ? G.teal : G.sub,
+              fontSize: 12, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6,
+            }}>
+            <LinkIcon size={13} /> Video URL
+          </button>
+          <button
+            type="button"
+            onClick={() => { setMode('file'); setError(''); }}
+            style={{
+              padding: '6px 14px', borderRadius: 9,
+              background: mode === 'file' ? G.tealBg : 'transparent',
+              border: `1px solid ${mode === 'file' ? G.tealBdr : G.border}`,
+              color: mode === 'file' ? G.teal : G.sub,
+              fontSize: 12, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6,
+            }}>
+            <Upload size={13} /> Upload Video File (&le; 100MB)
+          </button>
+        </div>
+
+        {mode === 'url' ? (
+          <form onSubmit={handleIngest} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <div style={{ flex: 1, position: 'relative' }}>
+                <LinkIcon size={14} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: G.muted }} />
+                <input
+                  type="url" value={url} onChange={e => setUrl(e.target.value)}
+                  placeholder="Direct .mp4 link (Dropbox dl=1, GitHub raw, Google Drive, Box), or YouTube URL"
+                  disabled={loading} required
+                  style={{
+                    width: '100%', paddingLeft: 36, paddingRight: 16, paddingTop: 10, paddingBottom: 10,
+                    borderRadius: 12, border: `1px solid ${G.border}`, background: '#f8fafc',
+                    fontSize: 13, color: G.text, outline: 'none', boxSizing: 'border-box',
+                  }}
+                  onFocus={e => e.target.style.borderColor = G.tealBdr}
+                  onBlur={e => e.target.style.borderColor = G.border}
+                />
+              </div>
+              <motion.button whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
+                type="submit" disabled={loading || !url.trim()}
                 style={{
-                  width: '100%', paddingLeft: 36, paddingRight: 16, paddingTop: 10, paddingBottom: 10,
-                  borderRadius: 12, border: `1px solid ${G.border}`, background: '#f8fafc',
+                  display: 'flex', alignItems: 'center', gap: 6, padding: '10px 20px',
+                  borderRadius: 12, border: 'none', cursor: loading ? 'not-allowed' : 'pointer',
+                  fontWeight: 700, fontSize: 13,
+                  background: loading ? G.border : `linear-gradient(135deg, ${G.teal}, #FFC81E)`,
+                  color: loading ? G.muted : '#fff',
+                  boxShadow: loading ? 'none' : `0 0 20px ${G.teal}35`,
+                  opacity: (!url.trim() && !loading) ? 0.5 : 1,
+                }}>
+                {loading ? <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> : <Plus size={14} />}
+                Ingest
+              </motion.button>
+            </div>
+            {/* Title field — required for Drive/direct links so Spider can search YouTube */}
+            {url && !url.includes('youtube.com') && !url.includes('youtu.be') && (
+              <input
+                type="text" value={title} onChange={e => setTitle(e.target.value)}
+                placeholder="Video title (required for non-YouTube links — used for piracy search)"
+                disabled={loading}
+                style={{
+                  width: '100%', padding: '10px 14px',
+                  borderRadius: 12, border: `1px solid ${G.tealBdr}`, background: '#f0fdf9',
                   fontSize: 13, color: G.text, outline: 'none', boxSizing: 'border-box',
                 }}
-                onFocus={e => e.target.style.borderColor = G.tealBdr}
-                onBlur={e => e.target.style.borderColor = G.border}
               />
+            )}
+          </form>
+        ) : (
+          <form onSubmit={handleUpload} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <div style={{ flex: 1, position: 'relative' }}>
+                <input
+                  type="file"
+                  accept="video/mp4,video/quicktime,video/webm,video/x-msvideo,video/x-matroska,.mp4,.mov,.webm,.avi,.mkv"
+                  onChange={e => setSelectedFile(e.target.files?.[0] || null)}
+                  disabled={loading}
+                  required
+                  style={{
+                    width: '100%', padding: '8px 12px',
+                    borderRadius: 12, border: `1px solid ${G.border}`, background: '#f8fafc',
+                    fontSize: 13, color: G.text, outline: 'none', boxSizing: 'border-box',
+                  }}
+                />
+              </div>
+              <motion.button whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
+                type="submit" disabled={loading || !selectedFile}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 6, padding: '10px 20px',
+                  borderRadius: 12, border: 'none', cursor: loading ? 'not-allowed' : 'pointer',
+                  fontWeight: 700, fontSize: 13,
+                  background: loading ? G.border : `linear-gradient(135deg, ${G.teal}, #FFC81E)`,
+                  color: loading ? G.muted : '#fff',
+                  boxShadow: loading ? 'none' : `0 0 20px ${G.teal}35`,
+                  opacity: (!selectedFile && !loading) ? 0.5 : 1,
+                }}>
+                {loading ? <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> : <Upload size={14} />}
+                Upload
+              </motion.button>
             </div>
-            <motion.button whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
-              type="submit" disabled={loading || !url.trim()}
-              style={{
-                display: 'flex', alignItems: 'center', gap: 6, padding: '10px 20px',
-                borderRadius: 12, border: 'none', cursor: loading ? 'not-allowed' : 'pointer',
-                fontWeight: 700, fontSize: 13,
-                background: loading ? G.border : `linear-gradient(135deg, ${G.teal}, #FFC81E)`,
-                color: loading ? G.muted : '#fff',
-                boxShadow: loading ? 'none' : `0 0 20px ${G.teal}35`,
-                opacity: (!url.trim() && !loading) ? 0.5 : 1,
-              }}>
-              {loading ? <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> : <Plus size={14} />}
-              Ingest
-            </motion.button>
-          </div>
-          {/* Title field — required for Drive/direct links so Spider can search YouTube */}
-          {url && !url.includes('youtube.com') && !url.includes('youtu.be') && (
             <input
               type="text" value={title} onChange={e => setTitle(e.target.value)}
-              placeholder="Video title (required for non-YouTube links — used for piracy search)"
+              placeholder="Custom asset title (optional, defaults to filename)"
               disabled={loading}
               style={{
                 width: '100%', padding: '10px 14px',
-                borderRadius: 12, border: `1px solid ${G.tealBdr}`, background: '#f0fdf9',
+                borderRadius: 12, border: `1px solid ${G.border}`, background: '#f8fafc',
                 fontSize: 13, color: G.text, outline: 'none', boxSizing: 'border-box',
               }}
             />
-          )}
-        </form>
+          </form>
+        )}
 
         <AnimatePresence>
           {progress && <ProgressTimeline stage={progress.stage} message={progress.message} />}
@@ -579,7 +780,7 @@ const AssetVault = () => {
         </div>
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
-          {assets.map(asset => <AssetCard key={asset._id} asset={asset} onDelete={handleDeleteClick} />)}
+          {assets.map(asset => <AssetCard key={asset._id} asset={asset} onDelete={handleDeleteClick} onRetry={handleRetry} />)}
         </div>
       )}
 

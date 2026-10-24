@@ -76,13 +76,18 @@ export const ingestAsset = async (req, res) => {
             vault_size:    statusData.vault_size,
             tx_hash:       statusData.tx_hash,
             integrity_hash,
-            status:        "complete",
+            status:        statusData.partial ? "partial" : "complete",
           });
 
           io.emit("ingest:complete", {
             jobId, assetId: asset._id,
             title:       statusData.title,
             frame_count: statusData.frame_count,
+            vault_size:  statusData.vault_size,
+            tx_hash:     statusData.tx_hash,
+            integrity_hash,
+            partial:     statusData.partial || false,
+          });
             vault_size:  statusData.vault_size,
             tx_hash:     statusData.tx_hash,
             integrity_hash,
@@ -121,10 +126,110 @@ export const ingestAsset = async (req, res) => {
   }
 };
 
+export const uploadAsset = async (req, res) => {
+  if (!req.file) {
+    throw new ExpressError(400, "No video file provided");
+  }
+
+  const { video_title = "" } = req.body;
+  const fileName = req.file.originalname || "uploaded_video.mp4";
+  const title = video_title || fileName.replace(/\.[^/.]+$/, "");
+  const io = getIO();
+
+  const formData = new FormData();
+  const blob = new Blob([req.file.buffer], { type: req.file.mimetype || "video/mp4" });
+  formData.append("file", blob, fileName);
+  formData.append("video_title", title);
+
+  const { data: fastRes } = await fastapiClient.post("/ingest/upload", formData, {
+    maxBodyLength: Infinity,
+    maxContentLength: Infinity,
+    timeout: 120000,
+  });
+
+  const jobId = fastRes.job_id;
+  const asset = await safeSaveAsset({
+    official_video_url: `upload://${fileName}`,
+    title,
+    status: "processing"
+  });
+
+  res.json({ success: true, message: "File uploaded. Ingest job started.", assetId: asset._id, jobId });
+
+  const MAX_POLLS = 180;
+  let polls = 0;
+
+  const poll = async () => {
+    polls++;
+    if (polls > MAX_POLLS) {
+      await safeUpdateAsset(asset._id, { status: "failed", error_message: "Upload ingest timed out" });
+      io.emit("ingest:error", { jobId, assetId: asset._id, message: "Upload ingest timed out" });
+      return;
+    }
+
+    try {
+      const { data: statusData } = await fastapiClient.get(`/ingest/status/${jobId}`);
+      if (statusData.status === "processing") {
+        io.emit("ingest:progress", {
+          jobId, assetId: asset._id, stage: "processing",
+          message: statusData.message || "Embedding frames into FAISS vault...",
+        });
+        setTimeout(poll, 2000);
+      } else if (statusData.status === "complete") {
+        const integrity_hash = generateHash({
+          url: `upload://${fileName}`,
+          tx_hash: statusData.tx_hash,
+          frame_count: statusData.frame_count,
+        });
+
+        await safeUpdateAsset(asset._id, {
+          title:         statusData.title || title,
+          local_path:    statusData.local_path,
+          frame_count:   statusData.frame_count,
+          vault_size:    statusData.vault_size,
+          tx_hash:       statusData.tx_hash,
+          integrity_hash,
+          status:        statusData.partial ? "partial" : "complete",
+        });
+
+        io.emit("ingest:complete", {
+          jobId, assetId: asset._id,
+          title:       statusData.title || title,
+          frame_count: statusData.frame_count,
+          vault_size:  statusData.vault_size,
+          tx_hash:     statusData.tx_hash,
+          integrity_hash,
+          partial:     statusData.partial || false,
+        });
+      } else if (statusData.status === "failed") {
+        await safeUpdateAsset(asset._id, { status: "failed", error_message: statusData.message });
+        io.emit("ingest:error", { jobId, assetId: asset._id, message: statusData.message });
+      } else {
+        setTimeout(poll, 2000);
+      }
+    } catch {
+      setTimeout(poll, 3000);
+    }
+  };
+
+  setTimeout(poll, 1500);
+};
+
 export const getAssets = async (_req, res) => {
   try {
     const { safeFindAssets } = await import("../utils/memoryStore.js");
-    const assets = await safeFindAssets();
+    const rawAssets = await safeFindAssets();
+    // Deduplicate by official_video_url (keep newest entry)
+    const seen = new Set();
+    const assets = [];
+    for (let i = rawAssets.length - 1; i >= 0; i--) {
+      const a = rawAssets[i];
+      const key = a.official_video_url || String(a._id);
+      if (!seen.has(key)) {
+        seen.add(key);
+        assets.unshift(a);
+      }
+    }
     res.json({ success: true, data: assets });
   } catch {
     res.json({ success: true, data: [] });
