@@ -73,6 +73,7 @@ app.get("/api/health", async (_req, res) => {
     redis:        isRedisAvailable() ? "ok" : "unavailable",
     fastapi:      fastapiOk ? "ok" : "unavailable",
     mongo:        mongoInfo.status,
+    mongoReason:  mongoInfo.status !== "ok" ? (mongoInfo.reason || "Not connected") : undefined,
     mongo_reason: mongoInfo.reason || undefined,
   });
 });

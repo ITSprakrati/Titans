@@ -60,8 +60,8 @@ const connectDB = async (retryCount = 0) => {
 
   try {
     const conn = await mongoose.connect(uri, {
-      serverSelectionTimeoutMS: 8000,
-      connectTimeoutMS: 10000,
+      serverSelectionTimeoutMS: 15000,
+      connectTimeoutMS: 15000,
     });
     lastMongoError = null;
     console.log(`✅ [MongoDB] Connected: ${conn.connection.host}`);
@@ -72,12 +72,11 @@ const connectDB = async (retryCount = 0) => {
     console.warn(`⚠️  [MongoDB Diagnosis] ${reason}`);
     console.warn("⚠️  Running with in-memory persistence fallback.");
 
-    // Retry up to 5 times with backoff if not an auth error
-    if (retryCount < 5 && !err.message.includes("bad auth")) {
-      const delay = Math.min(30000, (retryCount + 1) * 5000);
-      console.log(`[MongoDB] Scheduling retry ${retryCount + 1}/5 in ${delay / 1000}s...`);
-      setTimeout(() => connectDB(retryCount + 1), delay);
-    }
+    // Background retry: 10s x10, then every 60s
+    const nextRetry = retryCount + 1;
+    const delay = nextRetry <= 10 ? 10000 : 60000;
+    console.log(`[MongoDB] Scheduling retry #${nextRetry} in ${delay / 1000}s...`);
+    setTimeout(() => connectDB(nextRetry), delay);
   }
 };
 
