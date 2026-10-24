@@ -24,11 +24,11 @@ const G = {
 };
 
 const STATUS_CFG = {
-  complete:    { color: '#E87F24', bg: '#FEFDDF',                  border: 'rgba(232,127,36,0.35)',    label: 'PROTECTED'   },
+  complete:    { color: '#E87F24', bg: '#FEFDDF',                  border: 'rgba(232,127,36,0.35)',    label: 'FULL VIDEO' },
   processing:  { color: '#73A5CA', bg: 'rgba(115,165,202,0.12)',  border: 'rgba(115,165,202,0.35)',   label: 'PROCESSING'  },
   downloading: { color: '#FFC81E', bg: 'rgba(255,200,30,0.15)',   border: 'rgba(255,200,30,0.4)',     label: 'DOWNLOADING' },
   failed:      { color: '#ef4444', bg: 'rgba(239,68,68,0.08)',    border: 'rgba(239,68,68,0.2)',       label: 'FAILED'      },
-  partial:     { color: '#FFC81E', bg: 'rgba(255,200,30,0.15)',   border: 'rgba(255,200,30,0.4)',     label: 'PARTIAL'     },
+  partial:     { color: '#FFC81E', bg: 'rgba(255,200,30,0.15)',   border: 'rgba(255,200,30,0.4)',     label: 'PARTIAL: THUMBNAIL ONLY' },
 };
 
 const STAGES = ['queued', 'downloading', 'processing', 'complete'];
@@ -373,7 +373,7 @@ const AssetVault = () => {
   const { assets, refresh, setLiveMonitorActive } = useDashboard();
   const { eventLog, joinIngest } = useSocket();
 
-  const [mode,          setMode]          = useState('url'); // 'url' | 'file'
+  const [mode,          setMode]          = useState('file'); // 'file' | 'url'
   const [url,           setUrl]           = useState('');
   const [selectedFile,  setSelectedFile]  = useState(null);
   const [title,         setTitle]         = useState('');
@@ -628,8 +628,20 @@ const AssetVault = () => {
           </button>
         </div>
 
-        {/* Mode Toggle: URL vs Upload */}
+        {/* Mode Toggle: Upload vs URL */}
         <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
+          <button
+            type="button"
+            onClick={() => { setMode('file'); setError(''); }}
+            style={{
+              padding: '6px 14px', borderRadius: 9,
+              background: mode === 'file' ? G.tealBg : 'transparent',
+              border: `1px solid ${mode === 'file' ? G.tealBdr : G.border}`,
+              color: mode === 'file' ? G.teal : G.sub,
+              fontSize: 12, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6,
+            }}>
+            <Upload size={13} /> Upload Video File (mp4/mov/webm, &le;100 MB)
+          </button>
           <button
             type="button"
             onClick={() => { setMode('url'); setError(''); }}
@@ -641,18 +653,6 @@ const AssetVault = () => {
               fontSize: 12, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6,
             }}>
             <LinkIcon size={13} /> Video URL
-          </button>
-          <button
-            type="button"
-            onClick={() => { setMode('file'); setError(''); }}
-            style={{
-              padding: '6px 14px', borderRadius: 9,
-              background: mode === 'file' ? G.tealBg : 'transparent',
-              border: `1px solid ${mode === 'file' ? G.tealBdr : G.border}`,
-              color: mode === 'file' ? G.teal : G.sub,
-              fontSize: 12, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6,
-            }}>
-            <Upload size={13} /> Upload Video File (&le; 100MB)
           </button>
         </div>
 
@@ -702,6 +702,9 @@ const AssetVault = () => {
                 }}
               />
             )}
+            <p style={{ fontSize: 11, color: G.sub, margin: '2px 0 0', fontStyle: 'italic' }}>
+              💡 YouTube links give a partial fingerprint. Upload the video for a full one.
+            </p>
           </form>
         ) : (
           <form onSubmit={handleUpload} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>

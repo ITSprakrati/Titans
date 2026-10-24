@@ -918,25 +918,24 @@ def tool_ingest_video(video_path: str) -> str:
         _flush_batch()
 
     # ── Minimum Frame Guarantee ───────────────────────────────────────────────
-    # If zero scene boundaries were detected (e.g. single continuous camera shot
-    # with no cuts), force-sample uniform frames across the video duration.
-    MIN_FRAMES = 10
+    # Full video ingest must have at least 12 frames to ensure comprehensive fingerprinting.
+    MIN_FRAMES = 12
     duration_sec = total_frames / fps if (cv2 is not None and fps > 0) else (frame_id / fps if fps > 0 else 0)
 
-    if extracted_count == 0:
-        target_count = min(MIN_FRAMES, max(2, int(duration_sec / 2.0))) if duration_sec > 0 else 3
-        print(f"[Archivist] Zero scenes found — forcing uniform sampling ({target_count} frames) for {duration_sec:.1f}s video")
-        force_interval_sec = (duration_sec / target_count) if (target_count > 0 and duration_sec > 0) else 1.0
+    if extracted_count < MIN_FRAMES:
+        needed = MIN_FRAMES - extracted_count
+        target_count = min(needed, max(2, int(duration_sec / 2.0))) if duration_sec > 0 else needed
+        print(f"[Archivist] Below {MIN_FRAMES} frames ({extracted_count}) — supplemental uniform sampling ({target_count} frames) for {duration_sec:.1f}s video")
+        force_interval_sec = (duration_sec / max(1, target_count)) if (target_count > 0 and duration_sec > 0) else 1.0
         cap2 = cv2.VideoCapture(video_path) if cv2 is not None else None
         if cap2 and cap2.isOpened():
             for i in range(target_count):
-                target_ms = i * force_interval_sec * 1000
+                target_ms = (i + 0.5) * force_interval_sec * 1000
                 cap2.set(cv2.CAP_PROP_POS_MSEC, target_ms)
                 ret, frame = cap2.read()
                 if not ret:
                     continue
                 ts = target_ms / 1000.0
-                # Screen detection on forced frames too
                 screen_info = detect_screen_capture(frame)
                 if screen_info["is_screen_capture"] and screen_info["screen_corners"]:
                     frame = correct_perspective(frame, screen_info["screen_corners"])
@@ -946,7 +945,7 @@ def tool_ingest_video(video_path: str) -> str:
                 batch_screen_info.append(screen_info)
             cap2.release()
             _flush_batch()
-            print(f"[Archivist] Force-sampled {extracted_count} total frames (uniform interval={force_interval_sec:.1f}s)")
+            print(f"[Archivist] Reached {extracted_count} total frames for video")
 
     if extracted_count == 0:
         return f"[ERROR] No frames extracted — video may be corrupted or have no scene changes"
