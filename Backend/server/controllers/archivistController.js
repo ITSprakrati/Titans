@@ -88,10 +88,6 @@ export const ingestAsset = async (req, res) => {
             integrity_hash,
             partial:     statusData.partial || false,
           });
-            vault_size:  statusData.vault_size,
-            tx_hash:     statusData.tx_hash,
-            integrity_hash,
-          });
 
         } else if (statusData.status === "failed") {
           await safeUpdateAsset(asset._id, { status: "failed", error_message: statusData.message });
